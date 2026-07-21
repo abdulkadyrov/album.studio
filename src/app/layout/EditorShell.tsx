@@ -7,6 +7,7 @@ import {
   ImagePlus,
   Layers3,
   Link2,
+  Library,
   Magnet,
   Maximize2,
   Minus,
@@ -246,19 +247,46 @@ export function EditorShell() {
             onClick={() => setSnappingEnabled((value) => !value)}
           />
         </div>
-        <Button
-          variant="primary"
-          icon={<Download size={15} />}
-          onClick={() => navigate(routes.export(projectId))}
-        >
-          Экспорт
-        </Button>
+        <div className="editor-topbar__actions">
+          <Button
+            variant="secondary"
+            icon={<Library size={15} />}
+            onClick={() => {
+              const name = window.prompt('Название шаблона', 'Мой шаблон')?.trim();
+              if (!name) return;
+              const scope = window.confirm(
+                'Сохранить только текущую страницу? Нажмите «Отмена», чтобы сохранить весь проект.',
+              )
+                ? 'page'
+                : 'project';
+              void canvasRef.current
+                ?.saveAsTemplate({
+                  name,
+                  description: 'Пользовательский шаблон из редактора',
+                  category: 'general',
+                  style: 'modern',
+                  color: 'multicolor',
+                  scope,
+                })
+                .then(() => window.alert('Шаблон сохранён локально в каталоге'));
+            }}
+          >
+            В шаблоны
+          </Button>
+          <Button
+            variant="primary"
+            icon={<Download size={15} />}
+            onClick={() => navigate(routes.export(projectId))}
+          >
+            Экспорт
+          </Button>
+        </div>
       </header>
 
       <aside className="editor-tools" aria-label="Инструменты редактора">
         <input
           ref={imageInputRef}
-          className="visually-hidden"
+          className="sr-only"
           aria-label="Загрузить изображения"
           type="file"
           accept="image/jpeg,image/png,image/webp,image/svg+xml"

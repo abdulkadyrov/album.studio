@@ -1,20 +1,29 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 
 import { ProjectsPage } from './ProjectsPage';
 
 describe('ProjectsPage', () => {
-  it('показывает честное пустое состояние и отключённое создание проекта', () => {
-    render(<ProjectsPage />);
+  it('показывает честное пустое состояние и переход в каталог', async () => {
+    render(
+      <MemoryRouter>
+        <ProjectsPage />
+      </MemoryRouter>,
+    );
 
     expect(screen.getByRole('heading', { name: 'Проекты' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Проектов пока нет' })).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: /проект/i })[0]).toBeDisabled();
+    expect(await screen.findByRole('heading', { name: 'Проектов пока нет' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Создать из шаблона' })).toBeEnabled();
   });
 
   it('переключает вид списка локально', async () => {
     const user = userEvent.setup();
-    render(<ProjectsPage />);
+    render(
+      <MemoryRouter>
+        <ProjectsPage />
+      </MemoryRouter>,
+    );
 
     const gridButton = screen.getByRole('button', { name: 'Сетка' });
     const listButton = screen.getByRole('button', { name: 'Список' });

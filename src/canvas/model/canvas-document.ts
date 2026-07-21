@@ -15,6 +15,12 @@ export const textCaseSchema = z.enum(['original', 'upper', 'lower', 'title', 'se
 export const textOverflowModeSchema = z.enum(['warn', 'shrink', 'clip', 'wrap']);
 export const textBoxModeSchema = z.enum(['auto', 'fixed']);
 
+export const layerBindingSchema = z.object({
+  source: z.enum(['project', 'class', 'participant', 'teacher']),
+  field: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_.-]*$/),
+  fallback: z.string().optional(),
+});
+
 export const textShadowSchema = z.object({
   enabled: z.boolean(),
   color: z.string().min(1),
@@ -98,6 +104,7 @@ export const canvasLayerSchema = z
     stroke: z.string().min(1),
     strokeWidthMm: z.number().nonnegative().finite(),
     opacity: z.number().min(0).max(1),
+    binding: layerBindingSchema.optional(),
     text: textStyleSchema.optional(),
     image: imageStyleSchema.optional(),
   })
@@ -109,7 +116,7 @@ export const canvasLayerSchema = z
         message: 'Текстовый слой требует настройки текста',
       });
     }
-    if (['image', 'frame', 'decoration', 'background'].includes(layer.kind) && !layer.image) {
+    if (['image', 'decoration', 'background'].includes(layer.kind) && !layer.image) {
       context.addIssue({
         code: 'custom',
         path: ['image'],
@@ -136,6 +143,10 @@ export const canvasPageSchema = z.object({
   bleedMm: z.number().nonnegative().finite(),
   safeZoneMm: z.number().nonnegative().finite(),
   gridStepMm: z.number().positive().finite(),
+  pageType: z
+    .enum(['cover', 'portrait', 'group', 'teachers', 'class', 'events', 'closing', 'universal'])
+    .optional(),
+  repeatFor: z.enum(['none', 'student', 'teacher']).optional(),
 });
 
 export const canvasDocumentSchema = z.object({
@@ -147,6 +158,7 @@ export const canvasDocumentSchema = z.object({
 });
 
 export type CanvasLayerKind = z.infer<typeof canvasLayerKindSchema>;
+export type LayerBinding = z.infer<typeof layerBindingSchema>;
 export type CanvasTextStyle = z.infer<typeof textStyleSchema>;
 export type CanvasImageStyle = z.infer<typeof imageStyleSchema>;
 export type TextCase = z.infer<typeof textCaseSchema>;

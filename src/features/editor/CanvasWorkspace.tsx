@@ -32,6 +32,10 @@ import {
 import { canvasSceneRepository } from '../../data/repositories/canvas-scene-repository';
 import { fontRepository, type FontAsset } from '../../data/repositories/font-repository';
 import { imageRepository, type ImageAsset } from '../../data/repositories/image-repository';
+import {
+  templateRepository,
+  type SaveTemplateInput,
+} from '../../data/repositories/template-repository';
 import { fontRegistry } from '../../services/font-registry';
 import { imageObjectUrlRegistry } from '../../services/image-object-url-registry';
 import type { SaveStatus } from '../../stores/project-store';
@@ -90,6 +94,7 @@ export interface CanvasWorkspaceHandle {
   uploadFont: (file: File, family: string) => Promise<void>;
   deleteFont: (fontId: string) => Promise<void>;
   toggleFontFavorite: (fontId: string, favorite: boolean) => Promise<void>;
+  saveAsTemplate: (input: Omit<SaveTemplateInput, 'pageId'>) => Promise<string>;
 }
 
 interface CanvasWorkspaceProps {
@@ -324,6 +329,15 @@ function CanvasWorkspaceComponent(
         await fontRepository.setFavorite(fontId, favorite);
         await fontRegistry.initialize();
         onFontStateChange({ fonts: fontRegistry.getAssets() });
+      },
+      saveAsTemplate: async (input) => {
+        const document = documentRef.current;
+        if (!document) throw new Error('Проект ещё не загружен');
+        const manifest = await templateRepository.saveFromDocument(document, {
+          ...input,
+          pageId: activePageIdRef.current,
+        });
+        return manifest.template.id;
       },
     }),
     [applyDocument, importImages, onFontStateChange, projectId, refreshImageState],
