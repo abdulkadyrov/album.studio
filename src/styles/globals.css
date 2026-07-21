@@ -650,6 +650,170 @@
   align-items: center;
 }
 
+.validation-page,
+.export-page {
+  max-width: 1180px;
+}
+
+.validation-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.validation-summary-card {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  min-height: 78px;
+  align-items: center;
+  padding: 14px;
+  gap: 7px 10px;
+  text-align: left;
+  color: var(--text-secondary);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+
+.validation-summary-card strong {
+  grid-column: 2;
+  color: var(--text-primary);
+  font-size: 20px;
+}
+
+.validation-summary-card.is-active,
+.validation-summary-card.is-ok {
+  border-color: var(--accent-primary);
+  background: var(--accent-soft);
+}
+
+.validation-summary-card--error svg,
+.validation-issue--error > svg {
+  color: var(--danger);
+}
+
+.validation-summary-card--warning svg,
+.validation-issue--warning > svg {
+  color: var(--warning);
+}
+
+.validation-summary-card--info svg,
+.validation-issue--info > svg {
+  color: var(--accent-hover);
+}
+
+.validation-list {
+  display: grid;
+  gap: 8px;
+}
+
+.validation-issue,
+.validation-empty,
+.export-panel,
+.export-footer {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+
+.validation-issue {
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.validation-issue strong,
+.validation-empty strong,
+.export-panel h2 {
+  font-size: 13px;
+}
+
+.validation-issue span,
+.validation-empty span,
+.export-check-list span,
+.export-progress span,
+.export-progress small {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.validation-issue p {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.validation-empty {
+  place-items: center;
+  min-height: 180px;
+  text-align: center;
+}
+
+.export-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.export-panel {
+  align-content: start;
+}
+
+.export-check-list {
+  display: grid;
+  max-height: 270px;
+  overflow: auto;
+  gap: 8px;
+}
+
+.export-check-list label {
+  display: flex;
+  align-items: center;
+  min-height: 30px;
+  gap: 8px;
+}
+
+.export-panel .text-field select {
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  color: var(--text-primary);
+  background: var(--bg-control);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+}
+
+.export-blocker {
+  margin-top: 14px;
+  padding: 12px 14px;
+  color: var(--danger);
+  background: rgb(255 91 91 / 10%);
+  border: 1px solid rgb(255 91 91 / 30%);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+
+.export-footer {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  margin-top: 14px;
+}
+
+.export-progress {
+  display: grid;
+  gap: 5px;
+}
+
+.export-progress progress {
+  width: 100%;
+  height: 8px;
+  accent-color: var(--accent-primary);
+}
+
 .template-result-meta {
   margin: 15px 0 8px;
   color: var(--text-muted);

@@ -8,6 +8,8 @@ import { ProjectsPage } from '../features/projects/ProjectsPage';
 import { TemplatesPage } from '../features/templates/TemplatesPage';
 import { ClassImportPage } from '../features/participants/ClassImportPage';
 import { ParticipantsPage } from '../features/participants/ParticipantsPage';
+import { ValidationPage } from '../features/validation/ValidationPage';
+import { ExportPage } from '../features/export/ExportPage';
 
 export const router = createBrowserRouter([
   {
@@ -51,26 +53,8 @@ export const router = createBrowserRouter([
           />
         ),
       },
-      {
-        path: '/projects/:projectId/validation',
-        element: (
-          <ProjectSectionPage
-            title="Проверка проекта"
-            description="Контроль изображений, шрифтов, полей и печатного качества появится на этапе 9."
-            milestone="Этап 9"
-          />
-        ),
-      },
-      {
-        path: '/projects/:projectId/export',
-        element: (
-          <ProjectSectionPage
-            title="Экспорт"
-            description="Локальный экспорт PNG, JPEG, PDF и ZIP появится на этапе 9."
-            milestone="Этап 9"
-          />
-        ),
-      },
+      { path: '/projects/:projectId/validation', element: <ValidationPage /> },
+      { path: '/projects/:projectId/export', element: <ExportPage /> },
       { path: '/settings', element: <SettingsPage /> },
     ],
   },
