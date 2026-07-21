@@ -3,7 +3,11 @@ import {
   createFabricObject,
   fabricObjectToSnapshot,
 } from './layer-object.factory';
-import { createDefaultTextStyle, type CanvasObjectSnapshot } from '../model/canvas-document';
+import {
+  createDefaultImageStyle,
+  createDefaultTextStyle,
+  type CanvasObjectSnapshot,
+} from '../model/canvas-document';
 
 const fixture: CanvasObjectSnapshot = {
   id: 'object-1',
@@ -63,5 +67,29 @@ describe('layer object factory', () => {
 
     expect(object.get('text')).toBe('НАШ ДРУЖНЫЙ КЛАСС');
     expect(fabricObjectToSnapshot(object)).toEqual(textLayer);
+  });
+
+  it('сохраняет параметры изображения даже без доступного локального оригинала', () => {
+    const imageLayer: CanvasObjectSnapshot = {
+      ...fixture,
+      id: 'image-1',
+      kind: 'frame',
+      image: {
+        ...createDefaultImageStyle({
+          assetId: 'missing-image',
+          filename: 'portrait.webp',
+          mimeType: 'image/webp',
+          naturalWidthPx: 1200,
+          naturalHeightPx: 1600,
+        }),
+        frameShape: 'circle',
+        cropX: 0.3,
+        zoom: 1.4,
+      },
+    };
+
+    const restored = fabricObjectToSnapshot(createFabricObject(imageLayer));
+    expect(restored).toMatchObject(imageLayer);
+    expect(restored.image).toEqual(imageLayer.image);
   });
 });

@@ -1,6 +1,20 @@
-import { Ellipse, Rect, Shadow, Textbox, type FabricObject } from 'fabric';
+import {
+  Ellipse,
+  FabricImage,
+  Polygon,
+  Rect,
+  Shadow,
+  Textbox,
+  filters,
+  type FabricObject,
+} from 'fabric';
 
-import type { CanvasObjectSnapshot, CanvasTextStyle } from '../model/canvas-document';
+import type {
+  CanvasImageStyle,
+  CanvasLayerKind,
+  CanvasObjectSnapshot,
+  CanvasTextStyle,
+} from '../model/canvas-document';
 import { applyTextCase, resolveTextOverflow } from '../text/text-layout';
 import {
   logicalPixelsToMillimeters,
@@ -20,6 +34,12 @@ export type VakhaFabricObject = FabricObject & {
   vakhaTextWidthMm?: number;
   vakhaTextHeightMm?: number;
   vakhaTextOverflow?: boolean;
+  vakhaKind?: CanvasLayerKind;
+  vakhaImage?: CanvasImageStyle;
+  vakhaImageWidthMm?: number;
+  vakhaImageHeightMm?: number;
+  vakhaImageScaleX?: number;
+  vakhaImageScaleY?: number;
 };
 
 const selectionStyle = {
@@ -46,7 +66,7 @@ function withOpacity(color: string, opacity: number): string {
   return color;
 }
 
-function createShadow(text: CanvasTextStyle): Shadow | undefined {
+function createShadow(text: { shadow: CanvasTextStyle['shadow'] }): Shadow | undefined {
   if (!text.shadow.enabled) return undefined;
   return new Shadow({
     color: withOpacity(text.shadow.color, text.shadow.opacity),
@@ -132,9 +152,125 @@ function configureTextObject(
   object.setCoords();
 }
 
+function imageFilters(image: CanvasImageStyle) {
+  const result = [];
+  const brightness = Math.max(-1, Math.min(1, image.effects.brightness + image.effects.exposure));
+  if (brightness) result.push(new filters.Brightness({ brightness }));
+  if (image.effects.contrast)
+    result.push(new filters.Contrast({ contrast: image.effects.contrast }));
+  if (image.effects.saturation)
+    result.push(new filters.Saturation({ saturation: image.effects.saturation }));
+  if (image.effects.hue) result.push(new filters.HueRotation({ rotation: image.effects.hue }));
+  if (image.effects.blur) result.push(new filters.Blur({ blur: image.effects.blur }));
+  if (image.effects.grayscale) result.push(new filters.Grayscale());
+  if (image.effects.sepia) result.push(new filters.Sepia());
+  return result;
+}
+
+function createFrameClip(
+  image: CanvasImageStyle,
+  cropWidth: number,
+  cropHeight: number,
+  displayedScale: number,
+  svgMaskElement?: HTMLImageElement,
+): FabricObject | undefined {
+  if (image.frameShape === 'rectangle') return undefined;
+  if (image.frameShape === 'circle' || image.frameShape === 'oval') {
+    const circleRadius = Math.min(cropWidth, cropHeight) / 2;
+    return new Ellipse({
+      rx: image.frameShape === 'circle' ? circleRadius : cropWidth / 2,
+      ry: image.frameShape === 'circle' ? circleRadius : cropHeight / 2,
+      originX: 'center',
+      originY: 'center',
+    });
+  }
+  if (image.frameShape === 'polygon') {
+    return new Polygon(
+      [
+        { x: 0, y: cropHeight / 2 },
+        { x: cropWidth / 4, y: 0 },
+        { x: (cropWidth * 3) / 4, y: 0 },
+        { x: cropWidth, y: cropHeight / 2 },
+        { x: (cropWidth * 3) / 4, y: cropHeight },
+        { x: cropWidth / 4, y: cropHeight },
+      ],
+      { originX: 'center', originY: 'center' },
+    );
+  }
+  if (image.frameShape === 'svg' && svgMaskElement) {
+    return new FabricImage(svgMaskElement, {
+      originX: 'center',
+      originY: 'center',
+      scaleX: cropWidth / svgMaskElement.naturalWidth,
+      scaleY: cropHeight / svgMaskElement.naturalHeight,
+    });
+  }
+  return new Rect({
+    width: cropWidth,
+    height: cropHeight,
+    rx:
+      image.cornerRadiusMm > 0
+        ? millimetersToLogicalPixels(image.cornerRadiusMm) / displayedScale
+        : 24,
+    ry:
+      image.cornerRadiusMm > 0
+        ? millimetersToLogicalPixels(image.cornerRadiusMm) / displayedScale
+        : 24,
+    originX: 'center',
+    originY: 'center',
+  });
+}
+
+function configureImageObject(
+  object: FabricImage & VakhaFabricObject,
+  snapshot: CanvasObjectSnapshot,
+  svgMaskElement?: HTMLImageElement,
+): void {
+  const image = snapshot.image!;
+  const targetWidth = millimetersToLogicalPixels(snapshot.widthMm);
+  const targetHeight = millimetersToLogicalPixels(snapshot.heightMm);
+  const sourceRatio = image.naturalWidthPx / image.naturalHeightPx;
+  const targetRatio = targetWidth / targetHeight;
+  let cropWidth = image.naturalWidthPx;
+  let cropHeight = image.naturalHeightPx;
+  if (image.fit === 'cover') {
+    if (sourceRatio > targetRatio) cropWidth = image.naturalHeightPx * targetRatio;
+    else cropHeight = image.naturalWidthPx / targetRatio;
+    cropWidth /= image.zoom;
+    cropHeight /= image.zoom;
+  }
+  const maxCropX = Math.max(0, image.naturalWidthPx - cropWidth);
+  const maxCropY = Math.max(0, image.naturalHeightPx - cropHeight);
+  const cropX = maxCropX * image.cropX;
+  const cropY = maxCropY * image.cropY;
+  const coverScale = targetWidth / cropWidth;
+  const containScale = Math.min(targetWidth / cropWidth, targetHeight / cropHeight) * image.zoom;
+  const displayedScale = image.fit === 'cover' ? coverScale : containScale;
+  object.set({
+    width: cropWidth,
+    height: cropHeight,
+    cropX,
+    cropY,
+    scaleX: displayedScale * (image.flipX ? -1 : 1),
+    scaleY: displayedScale * (image.flipY ? -1 : 1),
+    clipPath: createFrameClip(image, cropWidth, cropHeight, displayedScale, svgMaskElement),
+    filters: imageFilters(image),
+    shadow: createShadow({ shadow: image.shadow }),
+  });
+  object.applyFilters();
+  object.vakhaImage = structuredClone(image);
+  object.vakhaImageWidthMm = snapshot.widthMm;
+  object.vakhaImageHeightMm = snapshot.heightMm;
+  object.vakhaImageScaleX = Math.abs(object.scaleX ?? 1);
+  object.vakhaImageScaleY = Math.abs(object.scaleY ?? 1);
+  object.setCoords();
+}
+
 export function createFabricObject(
   snapshot: CanvasObjectSnapshot,
   pageOffsetMm = 0,
+  imageElement?: HTMLImageElement,
+  svgMaskElement?: HTMLImageElement,
 ): VakhaFabricObject {
   if (snapshot.kind === 'group') throw new TypeError('Группа не является объектом Fabric');
   const sharedOptions = {
@@ -156,7 +292,23 @@ export function createFabricObject(
   };
 
   let object: VakhaFabricObject;
-  if (snapshot.kind === 'text') {
+  if (snapshot.image && imageElement) {
+    const fabricImage = new FabricImage(imageElement, sharedOptions) as FabricImage &
+      VakhaFabricObject;
+    configureImageObject(fabricImage, snapshot, svgMaskElement);
+    object = fabricImage;
+  } else if (snapshot.image) {
+    object = new Rect({
+      ...sharedOptions,
+      width: millimetersToLogicalPixels(snapshot.widthMm),
+      height: millimetersToLogicalPixels(snapshot.heightMm),
+      fill: snapshot.fill,
+      strokeDashArray: [10, 6],
+    });
+    object.vakhaImage = structuredClone(snapshot.image);
+    object.vakhaImageWidthMm = snapshot.widthMm;
+    object.vakhaImageHeightMm = snapshot.heightMm;
+  } else if (snapshot.kind === 'text') {
     const textbox = new Textbox('', {
       ...sharedOptions,
       editable: true,
@@ -186,6 +338,7 @@ export function createFabricObject(
   object.vakhaParentId = snapshot.parentId;
   object.vakhaZIndex = snapshot.zIndex;
   object.vakhaLocked = snapshot.locked;
+  object.vakhaKind = snapshot.kind;
   object.vakhaRole = 'content';
   return object;
 }
@@ -194,6 +347,7 @@ export function applySnapshotToFabricObject(
   object: VakhaFabricObject,
   snapshot: CanvasObjectSnapshot,
   pageOffsetMm = 0,
+  svgMaskElement?: HTMLImageElement,
 ): void {
   const width = millimetersToLogicalPixels(snapshot.widthMm);
   const height = millimetersToLogicalPixels(snapshot.heightMm);
@@ -218,7 +372,9 @@ export function applySnapshotToFabricObject(
   object.vakhaZIndex = snapshot.zIndex;
   object.vakhaLocked = snapshot.locked;
 
-  if (object instanceof Textbox && snapshot.kind === 'text') {
+  if (object instanceof FabricImage && snapshot.image) {
+    configureImageObject(object as FabricImage & VakhaFabricObject, snapshot, svgMaskElement);
+  } else if (object instanceof Textbox && snapshot.kind === 'text') {
     configureTextObject(object as Textbox & VakhaFabricObject, snapshot);
   } else if (object instanceof Ellipse) {
     object.set({ rx: width / 2, ry: height / 2 });
@@ -233,18 +389,25 @@ export function fabricObjectToSnapshot(
   object: VakhaFabricObject,
   pageOffsetMm = 0,
 ): CanvasObjectSnapshot {
-  const kind = object instanceof Textbox ? 'text' : object instanceof Ellipse ? 'circle' : 'rect';
-  const widthMm =
-    object instanceof Textbox
+  const kind =
+    object.vakhaKind ??
+    (object instanceof Textbox ? 'text' : object instanceof Ellipse ? 'circle' : 'rect');
+  const widthMm = object.vakhaImage
+    ? (object.vakhaImageWidthMm ?? logicalPixelsToMillimeters(object.getScaledWidth())) *
+      (Math.abs(object.scaleX ?? 1) / (object.vakhaImageScaleX ?? 1))
+    : object instanceof Textbox
       ? (object.vakhaTextWidthMm ?? logicalPixelsToMillimeters(object.width)) *
         Math.abs(object.scaleX ?? 1)
       : logicalPixelsToMillimeters((object.width ?? 0) * Math.abs(object.scaleX ?? 1));
-  const heightMm =
-    object instanceof Textbox
+  const heightMm = object.vakhaImage
+    ? (object.vakhaImageHeightMm ?? logicalPixelsToMillimeters(object.getScaledHeight())) *
+      (Math.abs(object.scaleY ?? 1) / (object.vakhaImageScaleY ?? 1))
+    : object instanceof Textbox
       ? (object.vakhaTextHeightMm ?? logicalPixelsToMillimeters(object.height)) *
         Math.abs(object.scaleY ?? 1)
       : logicalPixelsToMillimeters((object.height ?? 0) * Math.abs(object.scaleY ?? 1));
   const textStyle = object instanceof Textbox ? (object as VakhaFabricObject).vakhaText : undefined;
+  const imageStyle = object.vakhaImage;
 
   return {
     id: object.vakhaId ?? crypto.randomUUID(),
@@ -265,6 +428,7 @@ export function fabricObjectToSnapshot(
     strokeWidthMm: roundMillimeters(logicalPixelsToMillimeters(object.strokeWidth ?? 0)),
     opacity: object.opacity,
     text: textStyle ? structuredClone(textStyle) : undefined,
+    image: imageStyle ? structuredClone(imageStyle) : undefined,
   };
 }
 

@@ -35,16 +35,18 @@ import {
   CanvasWorkspace,
   type CanvasWorkspaceHandle,
   type FontWorkspaceState,
+  type ImageWorkspaceState,
   type PageNavigationState,
 } from '../../features/editor/CanvasWorkspace';
 import { LayerPanel } from '../../features/editor/LayerPanel';
 import { PageStrip } from '../../features/editor/PageStrip';
 import { TextPropertiesPanel } from '../../features/editor/TextPropertiesPanel';
+import { ImagePropertiesPanel } from '../../features/editor/ImagePropertiesPanel';
 import type { CanvasControllerState, CanvasTool } from '../../canvas/engine/CanvasController';
 import type { SaveStatus } from '../../stores/project-store';
 
 interface EditorToolDefinition {
-  id?: CanvasTool | 'zoom' | 'text';
+  id?: CanvasTool | 'zoom' | 'text' | 'photo' | 'frame' | 'shape' | 'decor' | 'background';
   label: string;
   icon: LucideIcon;
   enabled?: boolean;
@@ -53,11 +55,11 @@ interface EditorToolDefinition {
 const tools: readonly EditorToolDefinition[] = [
   { id: 'select', label: 'Выделение', icon: MousePointer2, enabled: true },
   { id: 'text', label: 'Текст', icon: Type, enabled: true },
-  { label: 'Фото', icon: ImagePlus },
-  { label: 'Фоторамка', icon: Frame },
-  { label: 'Фигура', icon: Shapes },
-  { label: 'Декор', icon: Sparkles },
-  { label: 'Фон', icon: Palette },
+  { id: 'photo', label: 'Фото', icon: ImagePlus, enabled: true },
+  { id: 'frame', label: 'Фоторамка', icon: Frame, enabled: true },
+  { id: 'shape', label: 'Фигура', icon: Shapes, enabled: true },
+  { id: 'decor', label: 'Декор', icon: Sparkles, enabled: true },
+  { id: 'background', label: 'Фон', icon: Palette, enabled: true },
   { label: 'QR-код', icon: QrCode },
   { label: 'Таблица', icon: Table2 },
   { id: 'pan', label: 'Рука', icon: Hand, enabled: true },
@@ -79,6 +81,8 @@ export function EditorShell() {
   const accent = useUiStore((state) => state.accent);
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>('layers');
   const canvasRef = useRef<CanvasWorkspaceHandle>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const pendingImageKindRef = useRef<'image' | 'frame' | 'decoration' | 'background'>('image');
   const [tool, setTool] = useState<CanvasTool>('select');
   const [gridVisible, setGridVisible] = useState(true);
   const [snappingEnabled, setSnappingEnabled] = useState(true);
@@ -92,6 +96,7 @@ export function EditorShell() {
     selectedIds: [],
     layers: [],
     textIssues: {},
+    imageIssues: {},
   });
   const [pageState, setPageState] = useState<PageNavigationState>({
     groups: [],
@@ -101,6 +106,7 @@ export function EditorShell() {
     layersByPage: {},
   });
   const [fontState, setFontState] = useState<FontWorkspaceState>({ fonts: [] });
+  const [imageState, setImageState] = useState<ImageWorkspaceState>({ assets: [] });
 
   const handleCanvasState = useCallback((state: CanvasControllerState) => {
     setCanvasState(state);
@@ -116,6 +122,10 @@ export function EditorShell() {
 
   const handleFontState = useCallback((state: FontWorkspaceState) => {
     setFontState(state);
+  }, []);
+
+  const handleImageState = useCallback((state: ImageWorkspaceState) => {
+    setImageState(state);
   }, []);
 
   useEffect(() => {
@@ -142,6 +152,21 @@ export function EditorShell() {
       setTool('select');
       setInspectorTab('properties');
       canvasRef.current?.addTextLayer();
+    }
+    if (id === 'shape') {
+      setTool('select');
+      setInspectorTab('properties');
+      canvasRef.current?.addShapeLayer('rect');
+    }
+    const imageKinds = {
+      photo: 'image',
+      frame: 'frame',
+      decor: 'decoration',
+      background: 'background',
+    } as const;
+    if (id && id in imageKinds) {
+      pendingImageKindRef.current = imageKinds[id as keyof typeof imageKinds];
+      imageInputRef.current?.click();
     }
   };
 
@@ -231,6 +256,23 @@ export function EditorShell() {
       </header>
 
       <aside className="editor-tools" aria-label="Инструменты редактора">
+        <input
+          ref={imageInputRef}
+          className="visually-hidden"
+          aria-label="Загрузить изображения"
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/svg+xml"
+          multiple
+          onChange={(event) => {
+            const files = [...(event.target.files ?? [])];
+            if (files.length > 0) {
+              setTool('select');
+              setInspectorTab('properties');
+              void canvasRef.current?.uploadImages(files, pendingImageKindRef.current);
+            }
+            event.target.value = '';
+          }}
+        />
         {tools.map(({ label, icon: Icon, id, enabled = false }) => {
           const isActive = id === tool;
           return (
@@ -274,6 +316,7 @@ export function EditorShell() {
           onStateChange={handleCanvasState}
           onPageStateChange={handlePageState}
           onFontStateChange={handleFontState}
+          onImageStateChange={handleImageState}
           onSaveStatusChange={handleSaveStatus}
         />
       </main>
@@ -295,11 +338,27 @@ export function EditorShell() {
           ))}
         </div>
         <div className="inspector-content">
-          <span className="status-badge">Этап 4</span>
+          <span className="status-badge">Этап 5</span>
           <h2>{inspectorTabs.find((tab) => tab.id === inspectorTab)?.label}</h2>
           {inspectorTab === 'properties' ? (
             canvasState.selected ? (
-              canvasState.selected.kind === 'text' ? (
+              canvasState.selected.image ? (
+                <ImagePropertiesPanel
+                  key={`${canvasState.selected.id}:${canvasState.selected.image.assetId}`}
+                  layer={canvasState.selected}
+                  issue={canvasState.imageIssues[canvasState.selected.id]}
+                  error={imageState.error}
+                  onUpdate={(patch) =>
+                    canvasRef.current?.updateImageLayer(canvasState.selected!.id, patch)
+                  }
+                  onReplace={async (file) => {
+                    await canvasRef.current?.replaceImage(canvasState.selected!.id, file);
+                  }}
+                  onUploadMask={async (file) => {
+                    await canvasRef.current?.setSvgMask(canvasState.selected!.id, file);
+                  }}
+                />
+              ) : canvasState.selected.kind === 'text' ? (
                 <TextPropertiesPanel
                   key={`${canvasState.selected.id}:${canvasState.selected.text?.content ?? ''}`}
                   layer={canvasState.selected}
@@ -368,6 +427,21 @@ export function EditorShell() {
               onGroup={(ids) => canvasRef.current?.groupLayers(ids)}
               onUngroup={(id) => canvasRef.current?.ungroupLayer(id)}
             />
+          ) : inspectorTab === 'effects' && canvasState.selected?.image ? (
+            <ImagePropertiesPanel
+              mode="effects"
+              layer={canvasState.selected}
+              issue={canvasState.imageIssues[canvasState.selected.id]}
+              onUpdate={(patch) =>
+                canvasRef.current?.updateImageLayer(canvasState.selected!.id, patch)
+              }
+              onReplace={async (file) => {
+                await canvasRef.current?.replaceImage(canvasState.selected!.id, file);
+              }}
+              onUploadMask={async (file) => {
+                await canvasRef.current?.setSvgMask(canvasState.selected!.id, file);
+              }}
+            />
           ) : inspectorTab === 'effects' && canvasState.selected?.kind === 'text' ? (
             <TextPropertiesPanel
               mode="effects"
@@ -391,7 +465,7 @@ export function EditorShell() {
             <p>Раздел будет подключён на соответствующем этапе. Сейчас он не имитирует работу.</p>
           )}
           <div
-            className={`inspector-stage-actions ${canvasState.selected?.kind === 'text' ? 'is-hidden' : ''}`}
+            className={`inspector-stage-actions ${canvasState.selected?.kind === 'text' || canvasState.selected?.image ? 'is-hidden' : ''}`}
           >
             <span>Сетка: {gridVisible ? 'включена' : 'скрыта'}</span>
             <span>Привязка: {snappingEnabled ? 'включена' : 'выключена'}</span>

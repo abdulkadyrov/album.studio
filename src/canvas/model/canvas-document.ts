@@ -1,6 +1,15 @@
 import { z } from 'zod';
 
-export const canvasLayerKindSchema = z.enum(['rect', 'circle', 'group', 'text']);
+export const canvasLayerKindSchema = z.enum([
+  'rect',
+  'circle',
+  'group',
+  'text',
+  'image',
+  'frame',
+  'decoration',
+  'background',
+]);
 
 export const textCaseSchema = z.enum(['original', 'upper', 'lower', 'title', 'sentence']);
 export const textOverflowModeSchema = z.enum(['warn', 'shrink', 'clip', 'wrap']);
@@ -38,6 +47,38 @@ export const textStyleSchema = z.object({
   shadow: textShadowSchema,
 });
 
+export const imageEffectsSchema = z.object({
+  brightness: z.number().min(-1).max(1),
+  contrast: z.number().min(-1).max(1),
+  saturation: z.number().min(-1).max(1),
+  exposure: z.number().min(-1).max(1),
+  hue: z.number().min(-1).max(1),
+  blur: z.number().min(0).max(1),
+  grayscale: z.boolean(),
+  sepia: z.boolean(),
+});
+
+export const imageStyleSchema = z.object({
+  assetId: z.string().min(1),
+  thumbnailAssetId: z.string().min(1).optional(),
+  filename: z.string().min(1),
+  mimeType: z.string().min(1),
+  naturalWidthPx: z.number().int().positive(),
+  naturalHeightPx: z.number().int().positive(),
+  fit: z.enum(['cover', 'contain']),
+  frameShape: z.enum(['rectangle', 'rounded', 'circle', 'oval', 'polygon', 'svg']),
+  svgMaskAssetId: z.string().min(1).optional(),
+  cropX: z.number().min(0).max(1),
+  cropY: z.number().min(0).max(1),
+  zoom: z.number().min(0.1).max(20),
+  imageRotationDeg: z.number().finite(),
+  flipX: z.boolean(),
+  flipY: z.boolean(),
+  cornerRadiusMm: z.number().nonnegative().finite(),
+  effects: imageEffectsSchema,
+  shadow: textShadowSchema,
+});
+
 export const canvasLayerSchema = z
   .object({
     id: z.string().min(1),
@@ -58,6 +99,7 @@ export const canvasLayerSchema = z
     strokeWidthMm: z.number().nonnegative().finite(),
     opacity: z.number().min(0).max(1),
     text: textStyleSchema.optional(),
+    image: imageStyleSchema.optional(),
   })
   .superRefine((layer, context) => {
     if (layer.kind === 'text' && !layer.text) {
@@ -65,6 +107,13 @@ export const canvasLayerSchema = z
         code: 'custom',
         path: ['text'],
         message: 'Текстовый слой требует настройки текста',
+      });
+    }
+    if (['image', 'frame', 'decoration', 'background'].includes(layer.kind) && !layer.image) {
+      context.addIssue({
+        code: 'custom',
+        path: ['image'],
+        message: 'Слой изображения требует ссылку на локальный ресурс',
       });
     }
     if (layer.text && layer.text.minFontSizePt > layer.text.fontSizePt) {
@@ -99,6 +148,7 @@ export const canvasDocumentSchema = z.object({
 
 export type CanvasLayerKind = z.infer<typeof canvasLayerKindSchema>;
 export type CanvasTextStyle = z.infer<typeof textStyleSchema>;
+export type CanvasImageStyle = z.infer<typeof imageStyleSchema>;
 export type TextCase = z.infer<typeof textCaseSchema>;
 export type TextOverflowMode = z.infer<typeof textOverflowModeSchema>;
 export type CanvasLayerSnapshot = z.infer<typeof canvasLayerSchema>;
@@ -148,6 +198,44 @@ export function createDefaultTextStyle(): CanvasTextStyle {
       blur: 4,
       offsetXmm: 1,
       offsetYmm: 1,
+    },
+  };
+}
+
+export function createDefaultImageStyle(
+  asset: Pick<
+    CanvasImageStyle,
+    'assetId' | 'thumbnailAssetId' | 'filename' | 'mimeType' | 'naturalWidthPx' | 'naturalHeightPx'
+  >,
+): CanvasImageStyle {
+  return {
+    ...asset,
+    fit: 'cover',
+    frameShape: 'rectangle',
+    cropX: 0.5,
+    cropY: 0.5,
+    zoom: 1,
+    imageRotationDeg: 0,
+    flipX: false,
+    flipY: false,
+    cornerRadiusMm: 0,
+    effects: {
+      brightness: 0,
+      contrast: 0,
+      saturation: 0,
+      exposure: 0,
+      hue: 0,
+      blur: 0,
+      grayscale: false,
+      sepia: false,
+    },
+    shadow: {
+      enabled: false,
+      color: '#000000',
+      opacity: 0.35,
+      blur: 8,
+      offsetXmm: 2,
+      offsetYmm: 2,
     },
   };
 }

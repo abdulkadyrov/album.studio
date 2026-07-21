@@ -3,12 +3,14 @@ import { ActiveSelection, Canvas, Point, type FabricObject, type Textbox } from 
 import { HistoryManager, type HistoryState } from '../history/HistoryManager';
 import {
   createDefaultCanvasDocument,
+  createDefaultImageStyle,
   createDefaultTextStyle,
   getActivePageGroup,
   getPageLayout,
   getSpreadWidthMm,
   normalizeDocumentOrder,
   type CanvasDocument,
+  type CanvasImageStyle,
   type CanvasLayerSnapshot,
   type CanvasTextStyle,
 } from '../model/canvas-document';
@@ -32,6 +34,10 @@ export interface CanvasControllerState extends HistoryState {
   selectedIds: string[];
   layers: CanvasLayerSnapshot[];
   textIssues: Record<string, { overflow: boolean; missingFont: boolean }>;
+  imageIssues: Record<
+    string,
+    { effectiveDpi: number; lowQuality: boolean; missing: boolean; missingMask: boolean }
+  >;
 }
 
 export interface TextLayerUpdate {
@@ -45,12 +51,35 @@ export interface TextLayerUpdate {
   heightMm?: number;
 }
 
+export interface ImageLayerUpdate {
+  image?: Partial<CanvasImageStyle> & {
+    effects?: Partial<CanvasImageStyle['effects']>;
+    shadow?: Partial<CanvasImageStyle['shadow']>;
+  };
+  opacity?: number;
+  stroke?: string;
+  strokeWidthMm?: number;
+  rotationDeg?: number;
+  widthMm?: number;
+  heightMm?: number;
+}
+
+export interface NewImageAsset {
+  id: string;
+  thumbnailId?: string;
+  filename: string;
+  mimeType: string;
+  widthPx: number;
+  heightPx: number;
+}
+
 interface CanvasControllerOptions {
   document: CanvasDocument;
   activePageId: string;
   onDocumentChange: (document: CanvasDocument) => void;
   onStateChange: (state: CanvasControllerState) => void;
   isFontAvailable?: (family: string, assetId?: string) => boolean;
+  getImageElement?: (assetId: string) => HTMLImageElement | undefined;
 }
 
 const MIN_ZOOM = 0.2;
@@ -77,6 +106,7 @@ export class CanvasController {
   private textEditingBefore?: CanvasLayerSnapshot;
   private ignoreTextModified = false;
   private readonly isFontAvailable: NonNullable<CanvasControllerOptions['isFontAvailable']>;
+  private readonly getImageElement: NonNullable<CanvasControllerOptions['getImageElement']>;
 
   constructor(element: HTMLCanvasElement, options: CanvasControllerOptions) {
     this.document = options.document;
@@ -84,6 +114,7 @@ export class CanvasController {
     this.onDocumentChange = options.onDocumentChange;
     this.onStateChange = options.onStateChange;
     this.isFontAvailable = options.isFontAvailable ?? (() => true);
+    this.getImageElement = options.getImageElement ?? (() => undefined);
     this.history = new HistoryManager(100, () => this.emitState());
     this.canvas = new Canvas(element, {
       selection: true,
@@ -201,6 +232,125 @@ export class CanvasController {
       layers: [...document.layers, layer],
     }));
     this.selectLayers([layer.id]);
+  }
+
+  addImageLayer(
+    asset: NewImageAsset,
+    kind: 'image' | 'frame' | 'decoration' | 'background' = 'image',
+  ): void {
+    const group = getActivePageGroup(this.document, this.activePageId);
+    const page =
+      group.pages.find((candidate) => candidate.id === this.activePageId) ?? group.pages[0]!;
+    const widthMm = kind === 'background' ? page.widthMm : kind === 'decoration' ? 70 : 90;
+    const heightMm = Math.max(30, widthMm * (asset.heightPx / asset.widthPx));
+    const layer: CanvasLayerSnapshot = {
+      id: this.newId(kind),
+      pageId: page.id,
+      name:
+        kind === 'frame'
+          ? 'Фоторамка'
+          : kind === 'decoration'
+            ? 'Декор'
+            : kind === 'background'
+              ? 'Фон страницы'
+              : asset.filename,
+      kind,
+      visible: true,
+      locked: false,
+      zIndex:
+        kind === 'background'
+          ? 0
+          : this.document.layers.filter((candidate) => candidate.pageId === page.id).length,
+      xMm: kind === 'background' ? 0 : 35,
+      yMm: kind === 'background' ? 0 : 35,
+      widthMm,
+      heightMm: kind === 'background' ? page.heightMm : Math.min(130, heightMm),
+      rotationDeg: 0,
+      fill: 'transparent',
+      stroke: kind === 'frame' ? '#ffffff' : 'transparent',
+      strokeWidthMm: kind === 'frame' ? 1 : 0,
+      opacity: 1,
+      image: createDefaultImageStyle({
+        assetId: asset.id,
+        thumbnailAssetId: asset.thumbnailId,
+        filename: asset.filename,
+        mimeType: asset.mimeType,
+        naturalWidthPx: asset.widthPx,
+        naturalHeightPx: asset.heightPx,
+      }),
+    };
+    if (kind === 'frame') layer.image!.frameShape = 'rounded';
+    this.updateDocument(
+      kind === 'frame' ? 'Добавление фоторамки' : 'Добавление изображения',
+      (document) => ({
+        ...document,
+        layers: kind === 'background' ? [layer, ...document.layers] : [...document.layers, layer],
+      }),
+    );
+    this.selectLayers([layer.id]);
+  }
+
+  addShapeLayer(kind: 'rect' | 'circle' = 'rect'): void {
+    const page = getActivePageGroup(this.document, this.activePageId).pages[0]!;
+    const layer: CanvasLayerSnapshot = {
+      id: this.newId('shape'),
+      pageId: page.id,
+      name: kind === 'circle' ? 'Круг' : 'Фигура',
+      kind,
+      visible: true,
+      locked: false,
+      zIndex: this.document.layers.filter((candidate) => candidate.pageId === page.id).length,
+      xMm: 50,
+      yMm: 50,
+      widthMm: 55,
+      heightMm: kind === 'circle' ? 55 : 40,
+      rotationDeg: 0,
+      fill: '#7657e8',
+      stroke: '#ffffff',
+      strokeWidthMm: 0.5,
+      opacity: 1,
+    };
+    this.updateDocument('Добавление фигуры', (document) => ({
+      ...document,
+      layers: [...document.layers, layer],
+    }));
+    this.selectLayers([layer.id]);
+  }
+
+  updateImageLayer(layerId: string, patch: ImageLayerUpdate): void {
+    const current = this.getLayer(layerId);
+    if (!current?.image) return;
+    this.updateDocument('Изменение изображения', (document) => ({
+      ...document,
+      layers: document.layers.map((layer) => {
+        if (layer.id !== layerId || !layer.image) return layer;
+        return {
+          ...layer,
+          ...patch,
+          image: patch.image
+            ? {
+                ...layer.image,
+                ...patch.image,
+                effects: patch.image.effects
+                  ? { ...layer.image.effects, ...patch.image.effects }
+                  : layer.image.effects,
+                shadow: patch.image.shadow
+                  ? { ...layer.image.shadow, ...patch.image.shadow }
+                  : layer.image.shadow,
+              }
+            : layer.image,
+        };
+      }),
+    }));
+    this.selectLayers([layerId]);
+  }
+
+  refreshImages(): void {
+    const selectedIds = this.canvas
+      .getActiveObjects()
+      .flatMap((object) => (object as VakhaFabricObject).vakhaId ?? []);
+    this.document = this.serializeDocument();
+    this.rebuildScene(selectedIds);
   }
 
   updateTextLayer(layerId: string, patch: TextLayerUpdate): void {
@@ -471,7 +621,16 @@ export class CanvasController {
       })
       .forEach((snapshot) => {
         const pageOffset = this.getPageOffsetMm(snapshot.pageId);
-        this.canvas.add(createFabricObject(snapshot, pageOffset));
+        this.canvas.add(
+          createFabricObject(
+            snapshot,
+            pageOffset,
+            snapshot.image ? this.getImageElement(snapshot.image.assetId) : undefined,
+            snapshot.image?.svgMaskAssetId
+              ? this.getImageElement(snapshot.image.svgMaskAssetId)
+              : undefined,
+          ),
+        );
       });
     this.setContentInteraction(this.tool === 'select');
     this.canvas.requestRenderAll();
@@ -627,7 +786,14 @@ export class CanvasController {
     label: string,
   ): void {
     const apply = (snapshot: CanvasLayerSnapshot) => {
-      applySnapshotToFabricObject(object, snapshot, this.getPageOffsetMm(snapshot.pageId));
+      applySnapshotToFabricObject(
+        object,
+        snapshot,
+        this.getPageOffsetMm(snapshot.pageId),
+        snapshot.image?.svgMaskAssetId
+          ? this.getImageElement(snapshot.image.svgMaskAssetId)
+          : undefined,
+      );
       this.canvas.setActiveObject(object);
       this.canvas.requestRenderAll();
       this.notifyDocumentChanged();
@@ -749,6 +915,31 @@ export class CanvasController {
           ];
         }),
     );
+    const imageIssues = Object.fromEntries(
+      this.getActiveLayers()
+        .filter((layer) => layer.image)
+        .map((layer) => {
+          const image = layer.image!;
+          const cropWidthPx =
+            image.fit === 'cover' ? image.naturalWidthPx / image.zoom : image.naturalWidthPx;
+          const cropHeightPx =
+            image.fit === 'cover' ? image.naturalHeightPx / image.zoom : image.naturalHeightPx;
+          const effectiveDpi = Math.round(
+            Math.min(cropWidthPx / (layer.widthMm / 25.4), cropHeightPx / (layer.heightMm / 25.4)),
+          );
+          return [
+            layer.id,
+            {
+              effectiveDpi,
+              lowQuality: effectiveDpi < 200,
+              missing: !this.getImageElement(image.assetId),
+              missingMask: Boolean(
+                image.svgMaskAssetId && !this.getImageElement(image.svgMaskAssetId),
+              ),
+            },
+          ];
+        }),
+    );
     this.onStateChange({
       zoom: this.canvas.getZoom(),
       viewportX: this.canvas.viewportTransform[4],
@@ -757,6 +948,7 @@ export class CanvasController {
       selectedIds,
       layers: this.getActiveLayers(),
       textIssues,
+      imageIssues,
       ...this.history.getState(),
     });
   }

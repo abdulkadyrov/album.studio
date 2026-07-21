@@ -7,6 +7,7 @@ import {
   EyeOff,
   Folder,
   Group,
+  Image as ImageIcon,
   Lock,
   Shapes,
   Trash2,
@@ -120,6 +121,8 @@ export function LayerPanel({
               <Folder size={13} />
             ) : layer.kind === 'text' ? (
               <Type size={12} />
+            ) : layer.image ? (
+              <ImageIcon size={12} />
             ) : layer.kind === 'circle' ? (
               <Circle size={12} />
             ) : (

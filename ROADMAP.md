@@ -142,8 +142,10 @@ Gate: оригинал сравним по hash/size до и после реда
 4. User-created templates.
 5. Template import/export.
 6. Page types and repeatFor.
+7. Versioned Codex-facing template manifest and deterministic validation/import.
+8. Prompt-to-template workflow: external Codex writes editable pages/layers/assets/fonts, never a flattened album image.
 
-Gate: изменение проекта не меняет template fixture; системные и пользовательские шаблоны различимы.
+Gate: изменение проекта не меняет template fixture; системные и пользовательские шаблоны различимы; Codex-generated fixture validates and remains layer-editable.
 
 ### M7 — Класс и участники
 

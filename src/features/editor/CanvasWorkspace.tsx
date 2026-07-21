@@ -12,6 +12,7 @@ import {
   CanvasController,
   type CanvasControllerState,
   type CanvasTool,
+  type ImageLayerUpdate,
   type TextLayerUpdate,
 } from '../../canvas/engine/CanvasController';
 import {
@@ -30,7 +31,9 @@ import {
 } from '../../canvas/model/document-commands';
 import { canvasSceneRepository } from '../../data/repositories/canvas-scene-repository';
 import { fontRepository, type FontAsset } from '../../data/repositories/font-repository';
+import { imageRepository, type ImageAsset } from '../../data/repositories/image-repository';
 import { fontRegistry } from '../../services/font-registry';
+import { imageObjectUrlRegistry } from '../../services/image-object-url-registry';
 import type { SaveStatus } from '../../stores/project-store';
 
 export interface PageNavigationState {
@@ -43,6 +46,11 @@ export interface PageNavigationState {
 
 export interface FontWorkspaceState {
   fonts: FontAsset[];
+  error?: string;
+}
+
+export interface ImageWorkspaceState {
+  assets: ImageAsset[];
   error?: string;
 }
 
@@ -71,6 +79,14 @@ export interface CanvasWorkspaceHandle {
   movePageGroup: (groupId: string, direction: -1 | 1) => void;
   addTextLayer: () => void;
   updateTextLayer: (layerId: string, patch: TextLayerUpdate) => void;
+  uploadImages: (
+    files: File[],
+    kind?: 'image' | 'frame' | 'decoration' | 'background',
+  ) => Promise<void>;
+  addShapeLayer: (kind?: 'rect' | 'circle') => void;
+  replaceImage: (layerId: string, file: File) => Promise<void>;
+  setSvgMask: (layerId: string, file: File) => Promise<void>;
+  updateImageLayer: (layerId: string, patch: ImageLayerUpdate) => void;
   uploadFont: (file: File, family: string) => Promise<void>;
   deleteFont: (fontId: string) => Promise<void>;
   toggleFontFavorite: (fontId: string, favorite: boolean) => Promise<void>;
@@ -84,6 +100,7 @@ interface CanvasWorkspaceProps {
   onStateChange: (state: CanvasControllerState) => void;
   onPageStateChange: (state: PageNavigationState) => void;
   onFontStateChange: (state: FontWorkspaceState) => void;
+  onImageStateChange: (state: ImageWorkspaceState) => void;
   onSaveStatusChange: (status: SaveStatus) => void;
 }
 
@@ -96,6 +113,7 @@ function CanvasWorkspaceComponent(
     onStateChange,
     onPageStateChange,
     onFontStateChange,
+    onImageStateChange,
     onSaveStatusChange,
   }: CanvasWorkspaceProps,
   ref: ForwardedRef<CanvasWorkspaceHandle>,
@@ -108,6 +126,28 @@ function CanvasWorkspaceComponent(
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const initialOptionsRef = useRef({ tool, gridVisible, snappingEnabled });
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+
+  const refreshImageState = useCallback(async () => {
+    onImageStateChange({ assets: await imageRepository.list(projectId) });
+  }, [onImageStateChange, projectId]);
+
+  const importImages = useCallback(
+    async (files: File[], kind: 'image' | 'frame' | 'decoration' | 'background' = 'image') => {
+      try {
+        for (const file of files) {
+          const asset = await imageRepository.save(file, projectId);
+          await imageObjectUrlRegistry.register(asset.id);
+          controllerRef.current?.addImageLayer(asset, kind);
+        }
+        await refreshImageState();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Не удалось загрузить изображение';
+        onImageStateChange({ assets: await imageRepository.list(projectId), error: message });
+        throw error;
+      }
+    },
+    [onImageStateChange, projectId, refreshImageState],
+  );
 
   const emitPageState = useCallback(
     (document: CanvasDocument, activePageId: string) => {
@@ -231,6 +271,37 @@ function CanvasWorkspaceComponent(
           });
         }
       },
+      uploadImages: importImages,
+      addShapeLayer: (kind = 'rect') => controllerRef.current?.addShapeLayer(kind),
+      replaceImage: async (layerId, file) => {
+        const asset = await imageRepository.save(file, projectId);
+        await imageObjectUrlRegistry.register(asset.id);
+        controllerRef.current?.updateImageLayer(layerId, {
+          image: {
+            assetId: asset.id,
+            thumbnailAssetId: asset.thumbnailId,
+            filename: asset.filename,
+            mimeType: asset.mimeType,
+            naturalWidthPx: asset.widthPx,
+            naturalHeightPx: asset.heightPx,
+            cropX: 0.5,
+            cropY: 0.5,
+            zoom: 1,
+          },
+        });
+        await refreshImageState();
+      },
+      setSvgMask: async (layerId, file) => {
+        if (file.type !== 'image/svg+xml' && !file.name.toLowerCase().endsWith('.svg'))
+          throw new Error('Для маски требуется безопасный SVG');
+        const asset = await imageRepository.save(file, projectId);
+        await imageObjectUrlRegistry.register(asset.id);
+        controllerRef.current?.updateImageLayer(layerId, {
+          image: { frameShape: 'svg', svgMaskAssetId: asset.id },
+        });
+        await refreshImageState();
+      },
+      updateImageLayer: (layerId, patch) => controllerRef.current?.updateImageLayer(layerId, patch),
       uploadFont: async (file, family) => {
         try {
           const asset = await fontRepository.save(file, family);
@@ -255,7 +326,7 @@ function CanvasWorkspaceComponent(
         onFontStateChange({ fonts: fontRegistry.getAssets() });
       },
     }),
-    [applyDocument, onFontStateChange],
+    [applyDocument, importImages, onFontStateChange, projectId, refreshImageState],
   );
 
   useEffect(() => {
@@ -268,6 +339,18 @@ function CanvasWorkspaceComponent(
         onFontStateChange({ fonts });
         const document =
           (await canvasSceneRepository.load(projectId)) ?? createDefaultCanvasDocument(projectId);
+        const imageAssets = await imageObjectUrlRegistry.initialize(
+          projectId,
+          document.layers.flatMap((layer) =>
+            layer.image
+              ? [
+                  layer.image.assetId,
+                  ...(layer.image.svgMaskAssetId ? [layer.image.svgMaskAssetId] : []),
+                ]
+              : [],
+          ),
+        );
+        onImageStateChange({ assets: imageAssets });
         if (!active || !canvasRef.current || !hostRef.current) return;
         const activePageId = document.pages[0]!.id;
         documentRef.current = document;
@@ -279,6 +362,16 @@ function CanvasWorkspaceComponent(
           activePageId,
           onDocumentChange: (nextDocument) => {
             documentRef.current = nextDocument;
+            imageObjectUrlRegistry.retain(
+              nextDocument.layers.flatMap((layer) =>
+                layer.image
+                  ? [
+                      layer.image.assetId,
+                      ...(layer.image.svgMaskAssetId ? [layer.image.svgMaskAssetId] : []),
+                    ]
+                  : [],
+              ),
+            );
             emitPageState(nextDocument, activePageIdRef.current ?? nextDocument.pages[0]!.id);
             queueSave(nextDocument);
           },
@@ -291,6 +384,7 @@ function CanvasWorkspaceComponent(
             onStateChange(state);
           },
           isFontAvailable: (family, assetId) => fontRegistry.isAvailable(family, assetId),
+          getImageElement: (assetId) => imageObjectUrlRegistry.getElement(assetId),
         });
         controllerRef.current = controller;
         controller.setTool(initialOptionsRef.current.tool);
@@ -318,12 +412,27 @@ function CanvasWorkspaceComponent(
       const controller = controllerRef.current;
       controllerRef.current = undefined;
       if (controller) void controller.dispose();
+      imageObjectUrlRegistry.clear();
     };
-  }, [emitPageState, onFontStateChange, onStateChange, projectId, queueSave]);
+  }, [emitPageState, onFontStateChange, onImageStateChange, onStateChange, projectId, queueSave]);
 
   useEffect(() => controllerRef.current?.setTool(tool), [tool]);
   useEffect(() => controllerRef.current?.setGridVisible(gridVisible), [gridVisible]);
   useEffect(() => controllerRef.current?.setSnapping(snappingEnabled), [snappingEnabled]);
+
+  useEffect(() => {
+    const handlePaste = (event: ClipboardEvent) => {
+      const files = [...(event.clipboardData?.files ?? [])].filter((file) =>
+        file.type.startsWith('image/'),
+      );
+      if (files.length > 0) {
+        event.preventDefault();
+        void importImages(files);
+      }
+    };
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [importImages]);
 
   return (
     <section
@@ -332,6 +441,18 @@ function CanvasWorkspaceComponent(
       aria-label="Интерактивный холст разворота"
       data-testid="canvas-workspace"
       data-status={status}
+      onDragOver={(event) => {
+        if (event.dataTransfer.types.includes('Files')) event.preventDefault();
+      }}
+      onDrop={(event) => {
+        const files = [...event.dataTransfer.files].filter((file) =>
+          file.type.startsWith('image/'),
+        );
+        if (files.length > 0) {
+          event.preventDefault();
+          void importImages(files);
+        }
+      }}
     >
       <canvas ref={canvasRef} aria-label="Холст Fabric.js" />
       {status === 'loading' ? (
