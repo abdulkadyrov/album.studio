@@ -82,6 +82,11 @@ interface CanvasControllerOptions {
   getImageElement?: (assetId: string) => HTMLImageElement | undefined;
 }
 
+type FabricTransformCanvas = Canvas & {
+  _currentTransform?: unknown;
+  endCurrentTransform: (event: Event) => void;
+};
+
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 2.5;
 const MAX_GROUP_DEPTH = 3;
@@ -128,6 +133,11 @@ export class CanvasController {
     this.bindCanvasEvents();
     window.addEventListener('keydown', this.handleKeyDown);
     window.addEventListener('keyup', this.handleKeyUp);
+    window.addEventListener('mouseup', this.releasePointerInteraction, true);
+    window.addEventListener('pointerup', this.releasePointerInteraction, true);
+    window.addEventListener('mousemove', this.handleReleasedPointerMove, true);
+    window.addEventListener('pointermove', this.handleReleasedPointerMove, true);
+    window.addEventListener('blur', this.releasePointerInteraction);
     this.emitState();
   }
 
@@ -599,6 +609,11 @@ export class CanvasController {
   async dispose(): Promise<void> {
     window.removeEventListener('keydown', this.handleKeyDown);
     window.removeEventListener('keyup', this.handleKeyUp);
+    window.removeEventListener('mouseup', this.releasePointerInteraction, true);
+    window.removeEventListener('pointerup', this.releasePointerInteraction, true);
+    window.removeEventListener('mousemove', this.handleReleasedPointerMove, true);
+    window.removeEventListener('pointermove', this.handleReleasedPointerMove, true);
+    window.removeEventListener('blur', this.releasePointerInteraction);
     await this.canvas.dispose();
   }
 
@@ -746,6 +761,10 @@ export class CanvasController {
     });
 
     this.canvas.on('mouse:move', ({ e }) => {
+      if (this.isPointerReleased(e)) {
+        this.releasePointerInteraction(e);
+        return;
+      }
       if (!this.draggingViewport) return;
       const pointer = this.canvas.getViewportPoint(e);
       const transform = [...this.canvas.viewportTransform] as [
@@ -764,12 +783,40 @@ export class CanvasController {
     });
 
     this.canvas.on('mouse:up', () => {
-      if (!this.draggingViewport) return;
-      this.draggingViewport = false;
-      this.setContentInteraction(this.tool === 'select' && !this.spacePressed);
-      this.canvas.defaultCursor = this.tool === 'pan' ? 'grab' : 'default';
+      this.releaseViewportDrag();
     });
   }
+
+  private isPointerReleased(event: Event): boolean {
+    const isPointerEvent = typeof PointerEvent !== 'undefined' && event instanceof PointerEvent;
+    return (
+      (event instanceof MouseEvent || isPointerEvent) &&
+      event.buttons === 0 &&
+      event.type !== 'mouseup' &&
+      event.type !== 'pointerup'
+    );
+  }
+
+  private releaseViewportDrag(): void {
+    if (!this.draggingViewport) return;
+    this.draggingViewport = false;
+    this.setContentInteraction(this.tool === 'select' && !this.spacePressed);
+    this.canvas.defaultCursor = this.tool === 'pan' ? 'grab' : 'default';
+  }
+
+  private releasePointerInteraction = (event: Event): void => {
+    this.releaseViewportDrag();
+    const canvas = this.canvas as FabricTransformCanvas;
+    if (!canvas._currentTransform) return;
+    canvas.endCurrentTransform(event);
+    this.canvas.requestRenderAll();
+    this.emitState();
+  };
+
+  private handleReleasedPointerMove = (event: MouseEvent | PointerEvent): void => {
+    if (event.buttons !== 0) return;
+    this.releasePointerInteraction(event);
+  };
 
   private setZoom(value: number): void {
     const zoom = clamp(value, MIN_ZOOM, MAX_ZOOM);
