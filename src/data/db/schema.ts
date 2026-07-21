@@ -59,7 +59,17 @@ export interface ParticipantRecord {
   type: 'student' | 'teacher';
   firstName: string;
   lastName: string;
+  middleName?: string;
+  displayName?: string;
+  externalId?: string;
+  role?: string;
+  email?: string;
+  phone?: string;
+  notes?: string;
+  tags?: string[];
   status: string;
+  importBatchId?: string;
+  importedAt?: string;
   updatedAt: string;
 }
 
@@ -70,6 +80,7 @@ export interface ParticipantPhotoRecord {
   assetId: string;
   role: 'main' | 'additional';
   order: number;
+  sourcePath?: string;
 }
 
 export interface OverrideRecord {

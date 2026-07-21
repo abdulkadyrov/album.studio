@@ -6,6 +6,8 @@ import { ProjectSectionPage } from '../features/common/ProjectSectionPage';
 import { SettingsPage } from '../features/settings/SettingsPage';
 import { ProjectsPage } from '../features/projects/ProjectsPage';
 import { TemplatesPage } from '../features/templates/TemplatesPage';
+import { ClassImportPage } from '../features/participants/ClassImportPage';
+import { ParticipantsPage } from '../features/participants/ParticipantsPage';
 
 export const router = createBrowserRouter([
   {
@@ -17,26 +19,8 @@ export const router = createBrowserRouter([
     children: [
       { path: '/projects', element: <ProjectsPage /> },
       { path: '/templates', element: <TemplatesPage /> },
-      {
-        path: '/projects/:projectId/import-class',
-        element: (
-          <ProjectSectionPage
-            title="Импорт класса"
-            description="Безопасная локальная загрузка пакетов .vsclass появится на этапе 7."
-            milestone="Этап 7"
-          />
-        ),
-      },
-      {
-        path: '/projects/:projectId/participants',
-        element: (
-          <ProjectSectionPage
-            title="Участники"
-            description="Ученики, учителя, статусы готовности и массовый выбор появятся на этапе 7."
-            milestone="Этап 7"
-          />
-        ),
-      },
+      { path: '/projects/:projectId/import-class', element: <ClassImportPage /> },
+      { path: '/projects/:projectId/participants', element: <ParticipantsPage /> },
       {
         path: '/projects/:projectId/references',
         element: (

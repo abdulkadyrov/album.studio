@@ -53,6 +53,8 @@ interface EditorToolDefinition {
   enabled?: boolean;
 }
 
+type EditorToolId = NonNullable<EditorToolDefinition['id']>;
+
 const tools: readonly EditorToolDefinition[] = [
   { id: 'select', label: 'Выделение', icon: MousePointer2, enabled: true },
   { id: 'text', label: 'Текст', icon: Type, enabled: true },
@@ -85,6 +87,7 @@ export function EditorShell() {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const pendingImageKindRef = useRef<'image' | 'frame' | 'decoration' | 'background'>('image');
   const [tool, setTool] = useState<CanvasTool>('select');
+  const [activeToolId, setActiveToolId] = useState<EditorToolId>('select');
   const [gridVisible, setGridVisible] = useState(true);
   const [snappingEnabled, setSnappingEnabled] = useState(true);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
@@ -147,8 +150,13 @@ export function EditorShell() {
   }, [canvasState.selectedIds.length, pageState.activeGroupId, pageState.groups]);
 
   const selectTool = (id?: string) => {
+    if (!id) return;
+    setActiveToolId(id as EditorToolId);
     if (id === 'select' || id === 'pan') setTool(id);
-    if (id === 'zoom') canvasRef.current?.fit();
+    if (id === 'zoom') {
+      setTool('select');
+      canvasRef.current?.fit();
+    }
     if (id === 'text') {
       setTool('select');
       setInspectorTab('properties');
@@ -295,6 +303,7 @@ export function EditorShell() {
             const files = [...(event.target.files ?? [])];
             if (files.length > 0) {
               setTool('select');
+              setActiveToolId('select');
               setInspectorTab('properties');
               void canvasRef.current?.uploadImages(files, pendingImageKindRef.current);
             }
@@ -302,13 +311,14 @@ export function EditorShell() {
           }}
         />
         {tools.map(({ label, icon: Icon, id, enabled = false }) => {
-          const isActive = id === tool;
+          const isActive = id === activeToolId;
           return (
             <button
               key={label}
               className={`tool-button ${isActive ? 'is-active' : ''}`}
               type="button"
               aria-label={label}
+              aria-pressed={enabled ? isActive : undefined}
               title={enabled ? label : `${label} — будет добавлено позже`}
               disabled={!enabled}
               onClick={() => selectTool(id)}

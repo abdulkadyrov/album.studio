@@ -120,5 +120,6 @@ Dexie открывает базу `vakha-album-designer` в IndexedDB. PWA Servi
 - [Архитектура](./ARCHITECTURE.md)
 - [Roadmap](./ROADMAP.md)
 - [Формат шаблонов `.vstemplate`](./TEMPLATE_FORMAT.md)
+- [Форматы данных `.vsclass`](./DATA_FORMATS.md)
 
-Форматы `.vsclass` и `.vsalbum` будут документированы в `DATA_FORMATS.md` при реализации соответствующих этапов, чтобы документация отражала реально работающие схемы.
+Формат `.vsalbum` будет документирован при реализации экспортного этапа, чтобы документация отражала реально работающую схему.
