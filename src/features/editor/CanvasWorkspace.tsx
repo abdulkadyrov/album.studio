@@ -12,6 +12,7 @@ import {
   CanvasController,
   type CanvasControllerState,
   type CanvasTool,
+  type TextLayerUpdate,
 } from '../../canvas/engine/CanvasController';
 import {
   createDefaultCanvasDocument,
@@ -28,6 +29,8 @@ import {
   movePageGroup,
 } from '../../canvas/model/document-commands';
 import { canvasSceneRepository } from '../../data/repositories/canvas-scene-repository';
+import { fontRepository, type FontAsset } from '../../data/repositories/font-repository';
+import { fontRegistry } from '../../services/font-registry';
 import type { SaveStatus } from '../../stores/project-store';
 
 export interface PageNavigationState {
@@ -36,6 +39,11 @@ export interface PageNavigationState {
   activePageId: string;
   layerCountByPage: Record<string, number>;
   layersByPage: Record<string, CanvasLayerSnapshot[]>;
+}
+
+export interface FontWorkspaceState {
+  fonts: FontAsset[];
+  error?: string;
 }
 
 export interface CanvasWorkspaceHandle {
@@ -61,6 +69,11 @@ export interface CanvasWorkspaceHandle {
   duplicatePageGroup: (groupId: string) => void;
   deletePageGroup: (groupId: string) => void;
   movePageGroup: (groupId: string, direction: -1 | 1) => void;
+  addTextLayer: () => void;
+  updateTextLayer: (layerId: string, patch: TextLayerUpdate) => void;
+  uploadFont: (file: File, family: string) => Promise<void>;
+  deleteFont: (fontId: string) => Promise<void>;
+  toggleFontFavorite: (fontId: string, favorite: boolean) => Promise<void>;
 }
 
 interface CanvasWorkspaceProps {
@@ -70,6 +83,7 @@ interface CanvasWorkspaceProps {
   snappingEnabled: boolean;
   onStateChange: (state: CanvasControllerState) => void;
   onPageStateChange: (state: PageNavigationState) => void;
+  onFontStateChange: (state: FontWorkspaceState) => void;
   onSaveStatusChange: (status: SaveStatus) => void;
 }
 
@@ -81,6 +95,7 @@ function CanvasWorkspaceComponent(
     snappingEnabled,
     onStateChange,
     onPageStateChange,
+    onFontStateChange,
     onSaveStatusChange,
   }: CanvasWorkspaceProps,
   ref: ForwardedRef<CanvasWorkspaceHandle>,
@@ -205,8 +220,42 @@ function CanvasWorkspaceComponent(
         if (!document || !activePageId) return;
         applyDocument(movePageGroup(document, groupId, direction), activePageId);
       },
+      addTextLayer: () => controllerRef.current?.addTextLayer(),
+      updateTextLayer: (layerId, patch) => {
+        controllerRef.current?.updateTextLayer(layerId, patch);
+        const fontAssetId = patch.text?.fontAssetId;
+        if (fontAssetId) {
+          void fontRepository.markUsed(fontAssetId).then(async () => {
+            await fontRegistry.initialize();
+            onFontStateChange({ fonts: fontRegistry.getAssets() });
+          });
+        }
+      },
+      uploadFont: async (file, family) => {
+        try {
+          const asset = await fontRepository.save(file, family);
+          await fontRegistry.register(asset);
+          onFontStateChange({ fonts: fontRegistry.getAssets() });
+          controllerRef.current?.refreshFonts();
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Не удалось загрузить шрифт';
+          onFontStateChange({ fonts: fontRegistry.getAssets(), error: message });
+          throw error;
+        }
+      },
+      deleteFont: async (fontId) => {
+        await fontRepository.delete(fontId);
+        fontRegistry.unregister(fontId);
+        onFontStateChange({ fonts: fontRegistry.getAssets() });
+        controllerRef.current?.refreshFonts();
+      },
+      toggleFontFavorite: async (fontId, favorite) => {
+        await fontRepository.setFavorite(fontId, favorite);
+        await fontRegistry.initialize();
+        onFontStateChange({ fonts: fontRegistry.getAssets() });
+      },
     }),
-    [applyDocument],
+    [applyDocument, onFontStateChange],
   );
 
   useEffect(() => {
@@ -215,6 +264,8 @@ function CanvasWorkspaceComponent(
 
     const initialize = async () => {
       try {
+        const fonts = await fontRegistry.initialize();
+        onFontStateChange({ fonts });
         const document =
           (await canvasSceneRepository.load(projectId)) ?? createDefaultCanvasDocument(projectId);
         if (!active || !canvasRef.current || !hostRef.current) return;
@@ -233,11 +284,13 @@ function CanvasWorkspaceComponent(
           },
           onStateChange: (state) => {
             if (hostRef.current) {
+              hostRef.current.dataset.zoom = String(state.zoom);
               hostRef.current.dataset.viewportX = String(state.viewportX);
               hostRef.current.dataset.viewportY = String(state.viewportY);
             }
             onStateChange(state);
           },
+          isFontAvailable: (family, assetId) => fontRegistry.isAvailable(family, assetId),
         });
         controllerRef.current = controller;
         controller.setTool(initialOptionsRef.current.tool);
@@ -266,7 +319,7 @@ function CanvasWorkspaceComponent(
       controllerRef.current = undefined;
       if (controller) void controller.dispose();
     };
-  }, [emitPageState, onStateChange, projectId, queueSave]);
+  }, [emitPageState, onFontStateChange, onStateChange, projectId, queueSave]);
 
   useEffect(() => controllerRef.current?.setTool(tool), [tool]);
   useEffect(() => controllerRef.current?.setGridVisible(gridVisible), [gridVisible]);

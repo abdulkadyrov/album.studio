@@ -1,26 +1,80 @@
 import { z } from 'zod';
 
-export const canvasLayerKindSchema = z.enum(['rect', 'circle', 'group']);
+export const canvasLayerKindSchema = z.enum(['rect', 'circle', 'group', 'text']);
 
-export const canvasLayerSchema = z.object({
-  id: z.string().min(1),
-  pageId: z.string().min(1),
-  parentId: z.string().min(1).optional(),
-  name: z.string().min(1),
-  kind: canvasLayerKindSchema,
-  visible: z.boolean(),
-  locked: z.boolean(),
-  zIndex: z.number().int().nonnegative(),
-  xMm: z.number().finite(),
-  yMm: z.number().finite(),
-  widthMm: z.number().positive().finite(),
-  heightMm: z.number().positive().finite(),
-  rotationDeg: z.number().finite(),
-  fill: z.string().min(1),
-  stroke: z.string().min(1),
-  strokeWidthMm: z.number().nonnegative().finite(),
+export const textCaseSchema = z.enum(['original', 'upper', 'lower', 'title', 'sentence']);
+export const textOverflowModeSchema = z.enum(['warn', 'shrink', 'clip', 'wrap']);
+export const textBoxModeSchema = z.enum(['auto', 'fixed']);
+
+export const textShadowSchema = z.object({
+  enabled: z.boolean(),
+  color: z.string().min(1),
   opacity: z.number().min(0).max(1),
+  blur: z.number().nonnegative().finite(),
+  offsetXmm: z.number().finite(),
+  offsetYmm: z.number().finite(),
 });
+
+export const textStyleSchema = z.object({
+  content: z.string(),
+  fontFamily: z.string().min(1),
+  fontAssetId: z.string().min(1).optional(),
+  fontSizePt: z.number().positive().finite(),
+  minFontSizePt: z.number().positive().finite(),
+  fontWeight: z.enum(['normal', 'bold', '300', '500', '600', '700', '800', '900']),
+  fontStyle: z.enum(['normal', 'italic']),
+  underline: z.boolean(),
+  linethrough: z.boolean(),
+  textAlign: z.enum(['left', 'center', 'right', 'justify']),
+  verticalAlign: z.enum(['top', 'middle', 'bottom']),
+  letterSpacingEm: z.number().min(-0.2).max(2).finite(),
+  lineHeight: z.number().min(0.5).max(4).finite(),
+  textCase: textCaseSchema,
+  paddingMm: z.number().nonnegative().finite(),
+  direction: z.enum(['ltr', 'rtl']),
+  boxMode: textBoxModeSchema,
+  maxLines: z.number().int().positive().max(100).optional(),
+  overflowMode: textOverflowModeSchema,
+  shadow: textShadowSchema,
+});
+
+export const canvasLayerSchema = z
+  .object({
+    id: z.string().min(1),
+    pageId: z.string().min(1),
+    parentId: z.string().min(1).optional(),
+    name: z.string().min(1),
+    kind: canvasLayerKindSchema,
+    visible: z.boolean(),
+    locked: z.boolean(),
+    zIndex: z.number().int().nonnegative(),
+    xMm: z.number().finite(),
+    yMm: z.number().finite(),
+    widthMm: z.number().positive().finite(),
+    heightMm: z.number().positive().finite(),
+    rotationDeg: z.number().finite(),
+    fill: z.string().min(1),
+    stroke: z.string().min(1),
+    strokeWidthMm: z.number().nonnegative().finite(),
+    opacity: z.number().min(0).max(1),
+    text: textStyleSchema.optional(),
+  })
+  .superRefine((layer, context) => {
+    if (layer.kind === 'text' && !layer.text) {
+      context.addIssue({
+        code: 'custom',
+        path: ['text'],
+        message: 'Текстовый слой требует настройки текста',
+      });
+    }
+    if (layer.text && layer.text.minFontSizePt > layer.text.fontSizePt) {
+      context.addIssue({
+        code: 'custom',
+        path: ['text', 'minFontSizePt'],
+        message: 'Минимальный размер не может превышать основной',
+      });
+    }
+  });
 
 export const canvasPageSchema = z.object({
   id: z.string().min(1),
@@ -44,6 +98,9 @@ export const canvasDocumentSchema = z.object({
 });
 
 export type CanvasLayerKind = z.infer<typeof canvasLayerKindSchema>;
+export type CanvasTextStyle = z.infer<typeof textStyleSchema>;
+export type TextCase = z.infer<typeof textCaseSchema>;
+export type TextOverflowMode = z.infer<typeof textOverflowModeSchema>;
 export type CanvasLayerSnapshot = z.infer<typeof canvasLayerSchema>;
 export type CanvasObjectSnapshot = CanvasLayerSnapshot;
 export type CanvasPageSnapshot = z.infer<typeof canvasPageSchema>;
@@ -62,6 +119,37 @@ export interface CanvasPageGroup {
   id: string;
   title: string;
   pages: CanvasPageSnapshot[];
+}
+
+export function createDefaultTextStyle(): CanvasTextStyle {
+  return {
+    content: 'Введите текст',
+    fontFamily: 'sans-serif',
+    fontSizePt: 28,
+    minFontSizePt: 10,
+    fontWeight: 'normal',
+    fontStyle: 'normal',
+    underline: false,
+    linethrough: false,
+    textAlign: 'left',
+    verticalAlign: 'top',
+    letterSpacingEm: 0,
+    lineHeight: 1.16,
+    textCase: 'original',
+    paddingMm: 2,
+    direction: 'ltr',
+    boxMode: 'fixed',
+    maxLines: 4,
+    overflowMode: 'warn',
+    shadow: {
+      enabled: false,
+      color: '#000000',
+      opacity: 0.35,
+      blur: 4,
+      offsetXmm: 1,
+      offsetYmm: 1,
+    },
+  };
 }
 
 export function getSpreadWidthMm(page: CanvasPageLayout): number {

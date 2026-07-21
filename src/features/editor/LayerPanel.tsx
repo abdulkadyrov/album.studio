@@ -10,6 +10,7 @@ import {
   Lock,
   Shapes,
   Trash2,
+  Type,
   Ungroup,
   Unlock,
 } from 'lucide-react';
@@ -117,6 +118,8 @@ export function LayerPanel({
           <span className="layer-row__icon">
             {isGroup ? (
               <Folder size={13} />
+            ) : layer.kind === 'text' ? (
+              <Type size={12} />
             ) : layer.kind === 'circle' ? (
               <Circle size={12} />
             ) : (

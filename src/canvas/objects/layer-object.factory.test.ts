@@ -3,7 +3,7 @@ import {
   createFabricObject,
   fabricObjectToSnapshot,
 } from './layer-object.factory';
-import type { CanvasObjectSnapshot } from '../model/canvas-document';
+import { createDefaultTextStyle, type CanvasObjectSnapshot } from '../model/canvas-document';
 
 const fixture: CanvasObjectSnapshot = {
   id: 'object-1',
@@ -40,5 +40,28 @@ describe('layer object factory', () => {
     expect(object.scaleX).toBe(1);
     expect(object.scaleY).toBe(1);
     expect(fabricObjectToSnapshot(object)).toEqual(changed);
+  });
+
+  it('сохраняет исходный текст и параметры текстовой области', () => {
+    const textLayer: CanvasObjectSnapshot = {
+      ...fixture,
+      id: 'text-1',
+      kind: 'text',
+      name: 'Заголовок',
+      widthMm: 100,
+      heightMm: 30,
+      fill: '#222222',
+      text: {
+        ...createDefaultTextStyle(),
+        content: 'наш дружный класс',
+        textCase: 'upper',
+        textAlign: 'center',
+      },
+    };
+
+    const object = createFabricObject(textLayer);
+
+    expect(object.get('text')).toBe('НАШ ДРУЖНЫЙ КЛАСС');
+    expect(fabricObjectToSnapshot(object)).toEqual(textLayer);
   });
 });

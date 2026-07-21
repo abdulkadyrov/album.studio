@@ -34,15 +34,17 @@ import { useUiStore } from '../../stores/ui-store';
 import {
   CanvasWorkspace,
   type CanvasWorkspaceHandle,
+  type FontWorkspaceState,
   type PageNavigationState,
 } from '../../features/editor/CanvasWorkspace';
 import { LayerPanel } from '../../features/editor/LayerPanel';
 import { PageStrip } from '../../features/editor/PageStrip';
+import { TextPropertiesPanel } from '../../features/editor/TextPropertiesPanel';
 import type { CanvasControllerState, CanvasTool } from '../../canvas/engine/CanvasController';
 import type { SaveStatus } from '../../stores/project-store';
 
 interface EditorToolDefinition {
-  id?: CanvasTool | 'zoom';
+  id?: CanvasTool | 'zoom' | 'text';
   label: string;
   icon: LucideIcon;
   enabled?: boolean;
@@ -50,7 +52,7 @@ interface EditorToolDefinition {
 
 const tools: readonly EditorToolDefinition[] = [
   { id: 'select', label: 'Выделение', icon: MousePointer2, enabled: true },
-  { label: 'Текст', icon: Type },
+  { id: 'text', label: 'Текст', icon: Type, enabled: true },
   { label: 'Фото', icon: ImagePlus },
   { label: 'Фоторамка', icon: Frame },
   { label: 'Фигура', icon: Shapes },
@@ -89,6 +91,7 @@ export function EditorShell() {
     canRedo: false,
     selectedIds: [],
     layers: [],
+    textIssues: {},
   });
   const [pageState, setPageState] = useState<PageNavigationState>({
     groups: [],
@@ -97,6 +100,7 @@ export function EditorShell() {
     layerCountByPage: {},
     layersByPage: {},
   });
+  const [fontState, setFontState] = useState<FontWorkspaceState>({ fonts: [] });
 
   const handleCanvasState = useCallback((state: CanvasControllerState) => {
     setCanvasState(state);
@@ -108,6 +112,10 @@ export function EditorShell() {
 
   const handlePageState = useCallback((state: PageNavigationState) => {
     setPageState(state);
+  }, []);
+
+  const handleFontState = useCallback((state: FontWorkspaceState) => {
+    setFontState(state);
   }, []);
 
   useEffect(() => {
@@ -130,6 +138,11 @@ export function EditorShell() {
   const selectTool = (id?: string) => {
     if (id === 'select' || id === 'pan') setTool(id);
     if (id === 'zoom') canvasRef.current?.fit();
+    if (id === 'text') {
+      setTool('select');
+      setInspectorTab('properties');
+      canvasRef.current?.addTextLayer();
+    }
   };
 
   const resetCanvas = () => {
@@ -260,6 +273,7 @@ export function EditorShell() {
           snappingEnabled={snappingEnabled}
           onStateChange={handleCanvasState}
           onPageStateChange={handlePageState}
+          onFontStateChange={handleFontState}
           onSaveStatusChange={handleSaveStatus}
         />
       </main>
@@ -281,35 +295,57 @@ export function EditorShell() {
           ))}
         </div>
         <div className="inspector-content">
-          <span className="status-badge">Этап 3</span>
+          <span className="status-badge">Этап 4</span>
           <h2>{inspectorTabs.find((tab) => tab.id === inspectorTab)?.label}</h2>
           {inspectorTab === 'properties' ? (
             canvasState.selected ? (
-              <div className="object-properties" data-testid="selection-properties">
-                <strong>{canvasState.selected.name}</strong>
-                <dl>
-                  <div>
-                    <dt>X</dt>
-                    <dd>{canvasState.selected.xMm} мм</dd>
-                  </div>
-                  <div>
-                    <dt>Y</dt>
-                    <dd>{canvasState.selected.yMm} мм</dd>
-                  </div>
-                  <div>
-                    <dt>Ширина</dt>
-                    <dd>{canvasState.selected.widthMm} мм</dd>
-                  </div>
-                  <div>
-                    <dt>Высота</dt>
-                    <dd>{canvasState.selected.heightMm} мм</dd>
-                  </div>
-                  <div>
-                    <dt>Угол</dt>
-                    <dd>{canvasState.selected.rotationDeg}°</dd>
-                  </div>
-                </dl>
-              </div>
+              canvasState.selected.kind === 'text' ? (
+                <TextPropertiesPanel
+                  key={`${canvasState.selected.id}:${canvasState.selected.text?.content ?? ''}`}
+                  layer={canvasState.selected}
+                  fonts={fontState.fonts}
+                  fontError={fontState.error}
+                  issue={canvasState.textIssues[canvasState.selected.id]}
+                  onUpdate={(patch) =>
+                    canvasRef.current?.updateTextLayer(canvasState.selected!.id, patch)
+                  }
+                  onUploadFont={async (file, family) => {
+                    await canvasRef.current?.uploadFont(file, family);
+                  }}
+                  onDeleteFont={async (fontId) => {
+                    await canvasRef.current?.deleteFont(fontId);
+                  }}
+                  onToggleFavorite={async (fontId, favorite) => {
+                    await canvasRef.current?.toggleFontFavorite(fontId, favorite);
+                  }}
+                />
+              ) : (
+                <div className="object-properties" data-testid="selection-properties">
+                  <strong>{canvasState.selected.name}</strong>
+                  <dl>
+                    <div>
+                      <dt>X</dt>
+                      <dd>{canvasState.selected.xMm} мм</dd>
+                    </div>
+                    <div>
+                      <dt>Y</dt>
+                      <dd>{canvasState.selected.yMm} мм</dd>
+                    </div>
+                    <div>
+                      <dt>Ширина</dt>
+                      <dd>{canvasState.selected.widthMm} мм</dd>
+                    </div>
+                    <div>
+                      <dt>Высота</dt>
+                      <dd>{canvasState.selected.heightMm} мм</dd>
+                    </div>
+                    <div>
+                      <dt>Угол</dt>
+                      <dd>{canvasState.selected.rotationDeg}°</dd>
+                    </div>
+                  </dl>
+                </div>
+              )
             ) : (
               <p>Выберите объект на холсте, чтобы увидеть его координаты и размеры.</p>
             )
@@ -332,10 +368,31 @@ export function EditorShell() {
               onGroup={(ids) => canvasRef.current?.groupLayers(ids)}
               onUngroup={(id) => canvasRef.current?.ungroupLayer(id)}
             />
+          ) : inspectorTab === 'effects' && canvasState.selected?.kind === 'text' ? (
+            <TextPropertiesPanel
+              mode="effects"
+              layer={canvasState.selected}
+              fonts={fontState.fonts}
+              issue={canvasState.textIssues[canvasState.selected.id]}
+              onUpdate={(patch) =>
+                canvasRef.current?.updateTextLayer(canvasState.selected!.id, patch)
+              }
+              onUploadFont={async (file, family) => {
+                await canvasRef.current?.uploadFont(file, family);
+              }}
+              onDeleteFont={async (fontId) => {
+                await canvasRef.current?.deleteFont(fontId);
+              }}
+              onToggleFavorite={async (fontId, favorite) => {
+                await canvasRef.current?.toggleFontFavorite(fontId, favorite);
+              }}
+            />
           ) : (
             <p>Раздел будет подключён на соответствующем этапе. Сейчас он не имитирует работу.</p>
           )}
-          <div className="inspector-stage-actions">
+          <div
+            className={`inspector-stage-actions ${canvasState.selected?.kind === 'text' ? 'is-hidden' : ''}`}
+          >
             <span>Сетка: {gridVisible ? 'включена' : 'скрыта'}</span>
             <span>Привязка: {snappingEnabled ? 'включена' : 'выключена'}</span>
             <Button variant="ghost" onClick={resetCanvas}>

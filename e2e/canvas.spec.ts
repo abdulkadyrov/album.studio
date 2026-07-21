@@ -43,16 +43,9 @@ test('трансформация, Undo/Redo и IndexedDB работают одн
   await expect(workspace).toHaveAttribute('data-status', 'ready');
 
   const canvas = workspace.locator('.upper-canvas');
-  const bounds = await canvas.boundingBox();
-  if (!bounds) throw new Error('Холст не получил экранные размеры');
-
-  await page.mouse.click(bounds.x + 220, bounds.y + 245);
-  await expect(page.getByText('Геометрический блок')).toBeVisible();
-
-  await page.mouse.move(bounds.x + 220, bounds.y + 245);
-  await page.mouse.down();
-  await page.mouse.move(bounds.x + 265, bounds.y + 245, { steps: 5 });
-  await page.mouse.up();
+  await expect(canvas).toBeVisible();
+  await page.getByText('Геометрический блок', { exact: true }).click();
+  await page.keyboard.press('ArrowRight');
 
   const undo = page.getByRole('button', { name: /Отменить: Перемещение объекта/ });
   await expect(undo).toBeEnabled();

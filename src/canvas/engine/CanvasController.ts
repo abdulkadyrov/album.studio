@@ -1,19 +1,22 @@
-import { ActiveSelection, Canvas, Point, type FabricObject } from 'fabric';
+import { ActiveSelection, Canvas, Point, type FabricObject, type Textbox } from 'fabric';
 
 import { HistoryManager, type HistoryState } from '../history/HistoryManager';
 import {
   createDefaultCanvasDocument,
+  createDefaultTextStyle,
   getActivePageGroup,
   getPageLayout,
   getSpreadWidthMm,
   normalizeDocumentOrder,
   type CanvasDocument,
   type CanvasLayerSnapshot,
+  type CanvasTextStyle,
 } from '../model/canvas-document';
 import {
   applySnapshotToFabricObject,
   createFabricObject,
   fabricObjectToSnapshot,
+  updateFabricTextContent,
   type VakhaFabricObject,
 } from '../objects/layer-object.factory';
 import { createGridDecorations, createPageDecorations } from '../rendering/scene-decorations';
@@ -28,6 +31,18 @@ export interface CanvasControllerState extends HistoryState {
   selected?: CanvasLayerSnapshot;
   selectedIds: string[];
   layers: CanvasLayerSnapshot[];
+  textIssues: Record<string, { overflow: boolean; missingFont: boolean }>;
+}
+
+export interface TextLayerUpdate {
+  text?: Partial<CanvasTextStyle> & { shadow?: Partial<CanvasTextStyle['shadow']> };
+  fill?: string;
+  opacity?: number;
+  stroke?: string;
+  strokeWidthMm?: number;
+  rotationDeg?: number;
+  widthMm?: number;
+  heightMm?: number;
 }
 
 interface CanvasControllerOptions {
@@ -35,6 +50,7 @@ interface CanvasControllerOptions {
   activePageId: string;
   onDocumentChange: (document: CanvasDocument) => void;
   onStateChange: (state: CanvasControllerState) => void;
+  isFontAvailable?: (family: string, assetId?: string) => boolean;
 }
 
 const MIN_ZOOM = 0.2;
@@ -58,12 +74,16 @@ export class CanvasController {
   private gridVisible = true;
   private hasFitted = false;
   private suspendSelectionState = false;
+  private textEditingBefore?: CanvasLayerSnapshot;
+  private ignoreTextModified = false;
+  private readonly isFontAvailable: NonNullable<CanvasControllerOptions['isFontAvailable']>;
 
   constructor(element: HTMLCanvasElement, options: CanvasControllerOptions) {
     this.document = options.document;
     this.activePageId = options.activePageId;
     this.onDocumentChange = options.onDocumentChange;
     this.onStateChange = options.onStateChange;
+    this.isFontAvailable = options.isFontAvailable ?? (() => true);
     this.history = new HistoryManager(100, () => this.emitState());
     this.canvas = new Canvas(element, {
       selection: true,
@@ -151,6 +171,70 @@ export class CanvasController {
 
   redo(): void {
     this.history.redo();
+  }
+
+  addTextLayer(): void {
+    const group = getActivePageGroup(this.document, this.activePageId);
+    const page =
+      group.pages.find((candidate) => candidate.id === this.activePageId) ?? group.pages[0]!;
+    const layer: CanvasLayerSnapshot = {
+      id: this.newId('text'),
+      pageId: page.id,
+      name: 'Текстовый слой',
+      kind: 'text',
+      visible: true,
+      locked: false,
+      zIndex: this.document.layers.filter((candidate) => candidate.pageId === page.id).length,
+      xMm: 35,
+      yMm: 35,
+      widthMm: 130,
+      heightMm: 42,
+      rotationDeg: 0,
+      fill: '#202737',
+      stroke: 'transparent',
+      strokeWidthMm: 0,
+      opacity: 1,
+      text: createDefaultTextStyle(),
+    };
+    this.updateDocument('Добавление текста', (document) => ({
+      ...document,
+      layers: [...document.layers, layer],
+    }));
+    this.selectLayers([layer.id]);
+  }
+
+  updateTextLayer(layerId: string, patch: TextLayerUpdate): void {
+    const current = this.getLayer(layerId);
+    if (!current?.text) return;
+    this.updateDocument('Изменение текста', (document) => ({
+      ...document,
+      layers: document.layers.map((layer) => {
+        if (layer.id !== layerId || !layer.text) return layer;
+        const nextText = patch.text
+          ? {
+              ...layer.text,
+              ...patch.text,
+              shadow: patch.text.shadow
+                ? { ...layer.text.shadow, ...patch.text.shadow }
+                : layer.text.shadow,
+            }
+          : layer.text;
+        return {
+          ...layer,
+          ...patch,
+          text: nextText,
+        };
+      }),
+    }));
+    this.selectLayers([layerId]);
+  }
+
+  refreshFonts(): void {
+    const selectedIds = this.canvas
+      .getActiveObjects()
+      .flatMap((object) => (object as VakhaFabricObject).vakhaId ?? []);
+    this.document = this.serializeDocument();
+    this.rebuildScene(selectedIds);
   }
 
   selectLayers(layerIds: string[]): void {
@@ -429,11 +513,50 @@ export class CanvasController {
     this.canvas.on('object:modified', ({ target, action }) => {
       const object = target as VakhaFabricObject;
       if (object.vakhaRole !== 'content') return;
+      if (object instanceof Textbox && (object.isEditing || this.ignoreTextModified)) {
+        this.activeTransformBefore = undefined;
+        return;
+      }
       const before = this.activeTransformBefore;
       const after = this.snapshotObject(object);
       this.activeTransformBefore = undefined;
       if (before && JSON.stringify(before) !== JSON.stringify(after)) {
         this.recordObjectChange(object, before, after, this.getActionLabel(action));
+      }
+    });
+
+    this.canvas.on('text:editing:entered', ({ target }) => {
+      const object = target as Textbox & VakhaFabricObject;
+      if (!object.vakhaText) return;
+      this.activeTransformBefore = undefined;
+      this.textEditingBefore = this.snapshotObject(object);
+      object.set({ text: object.vakhaText.content });
+      object.initDimensions();
+      object.setCoords();
+      this.canvas.requestRenderAll();
+    });
+
+    this.canvas.on('text:changed', ({ target }) => {
+      const object = target as Textbox & VakhaFabricObject;
+      updateFabricTextContent(object, object.text);
+    });
+
+    this.canvas.on('text:editing:exited', ({ target }) => {
+      const object = target as Textbox & VakhaFabricObject;
+      if (!object.vakhaText) return;
+      updateFabricTextContent(object, object.text);
+      const before = this.textEditingBefore;
+      const after = this.snapshotObject(object);
+      this.textEditingBefore = undefined;
+      this.ignoreTextModified = true;
+      window.setTimeout(() => {
+        this.ignoreTextModified = false;
+      }, 0);
+      applySnapshotToFabricObject(object, after, this.getPageOffsetMm(after.pageId));
+      if (before && before.text?.content !== after.text?.content) {
+        this.recordObjectChange(object, before, after, 'Редактирование текста');
+      } else {
+        this.canvas.requestRenderAll();
       }
     });
 
@@ -610,6 +733,22 @@ export class CanvasController {
         .getActiveObjects()
         .flatMap((object) => (object as VakhaFabricObject).vakhaId ?? []);
     const selected = selectedIds.length === 1 ? this.getLayer(selectedIds[0]!) : undefined;
+    const textIssues = Object.fromEntries(
+      this.getActiveLayers()
+        .filter((layer) => layer.kind === 'text' && layer.text)
+        .map((layer) => {
+          const object = this.canvas
+            .getObjects()
+            .find((candidate) => (candidate as VakhaFabricObject).vakhaId === layer.id);
+          return [
+            layer.id,
+            {
+              overflow: object?.vakhaTextOverflow === true,
+              missingFont: !this.isFontAvailable(layer.text!.fontFamily, layer.text!.fontAssetId),
+            },
+          ];
+        }),
+    );
     this.onStateChange({
       zoom: this.canvas.getZoom(),
       viewportX: this.canvas.viewportTransform[4],
@@ -617,6 +756,7 @@ export class CanvasController {
       selected,
       selectedIds,
       layers: this.getActiveLayers(),
+      textIssues,
       ...this.history.getState(),
     });
   }

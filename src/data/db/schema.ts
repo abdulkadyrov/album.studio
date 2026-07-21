@@ -39,6 +39,7 @@ export interface AssetRecord {
   blob: Blob;
   hash?: string;
   sourceAssetId?: string;
+  metadata?: Record<string, unknown>;
   createdAt: string;
 }
 
