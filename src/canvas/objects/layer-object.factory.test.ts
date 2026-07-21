@@ -7,8 +7,12 @@ import type { CanvasObjectSnapshot } from '../model/canvas-document';
 
 const fixture: CanvasObjectSnapshot = {
   id: 'object-1',
+  pageId: 'page-1',
   name: 'Тестовый объект',
   kind: 'rect',
+  visible: true,
+  locked: false,
+  zIndex: 0,
   xMm: 12.5,
   yMm: 24,
   widthMm: 60,

@@ -1,10 +1,15 @@
 import { Line, Rect } from 'fabric';
 
-import { createDefaultCanvasDocument } from '../model/canvas-document';
+import {
+  createDefaultCanvasDocument,
+  getActivePageGroup,
+  getPageLayout,
+} from '../model/canvas-document';
 import { createGridDecorations, createPageDecorations } from './scene-decorations';
 
 describe('scene decorations', () => {
-  const page = createDefaultCanvasDocument('geometry-test').page;
+  const document = createDefaultCanvasDocument('geometry-test');
+  const page = getPageLayout(getActivePageGroup(document, document.pages[0]!.id));
 
   it('строит полный разворот из двух страниц 200 × 200 мм', () => {
     const decorations = createPageDecorations(page);

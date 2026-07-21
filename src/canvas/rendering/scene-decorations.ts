@@ -1,6 +1,6 @@
 import { Line, Rect, type FabricObject } from 'fabric';
 
-import { getSpreadWidthMm, type CanvasPageSnapshot } from '../model/canvas-document';
+import { getSpreadWidthMm, type CanvasPageLayout } from '../model/canvas-document';
 import { millimetersToLogicalPixels } from '../../utils/dimensions';
 import type { VakhaFabricObject } from '../objects/layer-object.factory';
 
@@ -11,7 +11,7 @@ function markDecoration<T extends FabricObject>(object: T): T {
   return object;
 }
 
-export function createPageDecorations(page: CanvasPageSnapshot): FabricObject[] {
+export function createPageDecorations(page: CanvasPageLayout): FabricObject[] {
   const pageWidth = millimetersToLogicalPixels(page.widthMm);
   const pageHeight = millimetersToLogicalPixels(page.heightMm);
   const safeInset = millimetersToLogicalPixels(page.safeZoneMm);
@@ -66,7 +66,7 @@ export function createPageDecorations(page: CanvasPageSnapshot): FabricObject[] 
   return decorations;
 }
 
-export function createGridDecorations(page: CanvasPageSnapshot): FabricObject[] {
+export function createGridDecorations(page: CanvasPageLayout): FabricObject[] {
   const spreadWidth = millimetersToLogicalPixels(getSpreadWidthMm(page));
   const pageHeight = millimetersToLogicalPixels(page.heightMm);
   const step = millimetersToLogicalPixels(page.gridStepMm);

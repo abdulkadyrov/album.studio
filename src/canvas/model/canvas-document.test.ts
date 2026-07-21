@@ -1,6 +1,8 @@
 import {
   canvasDocumentSchema,
   createDefaultCanvasDocument,
+  getActivePageGroup,
+  getPageLayout,
   getSpreadWidthMm,
 } from './canvas-document';
 
@@ -9,13 +11,16 @@ describe('canvas document', () => {
     const document = createDefaultCanvasDocument('test-project');
 
     expect(canvasDocumentSchema.parse(document)).toEqual(document);
-    expect(getSpreadWidthMm(document.page)).toBe(400);
-    expect(document.objects).toHaveLength(2);
+    const group = getActivePageGroup(document, document.pages[0]!.id);
+    expect(getSpreadWidthMm(getPageLayout(group))).toBe(400);
+    expect(document.pages).toHaveLength(2);
+    expect(document.layers).toHaveLength(2);
+    expect(document.pages[0]?.spreadId).toBe(document.pages[1]?.spreadId);
   });
 
   it('отклоняет слой без положительного размера', () => {
     const document = createDefaultCanvasDocument('test-project');
-    document.objects[0]!.widthMm = 0;
+    document.layers[0]!.widthMm = 0;
 
     expect(canvasDocumentSchema.safeParse(document).success).toBe(false);
   });

@@ -24,14 +24,20 @@ import {
   ZoomIn,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { Button } from '../../components/ui/Button';
 import { IconButton } from '../../components/ui/IconButton';
 import { routes } from '../routes';
 import { useUiStore } from '../../stores/ui-store';
-import { CanvasWorkspace, type CanvasWorkspaceHandle } from '../../features/editor/CanvasWorkspace';
+import {
+  CanvasWorkspace,
+  type CanvasWorkspaceHandle,
+  type PageNavigationState,
+} from '../../features/editor/CanvasWorkspace';
+import { LayerPanel } from '../../features/editor/LayerPanel';
+import { PageStrip } from '../../features/editor/PageStrip';
 import type { CanvasControllerState, CanvasTool } from '../../canvas/engine/CanvasController';
 import type { SaveStatus } from '../../stores/project-store';
 
@@ -81,6 +87,15 @@ export function EditorShell() {
     viewportY: 0,
     canUndo: false,
     canRedo: false,
+    selectedIds: [],
+    layers: [],
+  });
+  const [pageState, setPageState] = useState<PageNavigationState>({
+    groups: [],
+    activeGroupId: '',
+    activePageId: '',
+    layerCountByPage: {},
+    layersByPage: {},
   });
 
   const handleCanvasState = useCallback((state: CanvasControllerState) => {
@@ -90,6 +105,27 @@ export function EditorShell() {
   const handleSaveStatus = useCallback((status: SaveStatus) => {
     setSaveStatus(status);
   }, []);
+
+  const handlePageState = useCallback((state: PageNavigationState) => {
+    setPageState(state);
+  }, []);
+
+  useEffect(() => {
+    const handlePageNavigation = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.matches('input, textarea, [contenteditable="true"]')) return;
+      if (canvasState.selectedIds.length > 0 || !['ArrowLeft', 'ArrowRight'].includes(event.key))
+        return;
+      const index = pageState.groups.findIndex((group) => group.id === pageState.activeGroupId);
+      const nextIndex = event.key === 'ArrowRight' ? index + 1 : index - 1;
+      const nextGroup = pageState.groups[nextIndex];
+      if (!nextGroup) return;
+      event.preventDefault();
+      canvasRef.current?.selectPageGroup(nextGroup.id);
+    };
+    window.addEventListener('keydown', handlePageNavigation);
+    return () => window.removeEventListener('keydown', handlePageNavigation);
+  }, [canvasState.selectedIds.length, pageState.activeGroupId, pageState.groups]);
 
   const selectTool = (id?: string) => {
     if (id === 'select' || id === 'pan') setTool(id);
@@ -223,6 +259,7 @@ export function EditorShell() {
           gridVisible={gridVisible}
           snappingEnabled={snappingEnabled}
           onStateChange={handleCanvasState}
+          onPageStateChange={handlePageState}
           onSaveStatusChange={handleSaveStatus}
         />
       </main>
@@ -244,7 +281,7 @@ export function EditorShell() {
           ))}
         </div>
         <div className="inspector-content">
-          <span className="status-badge">Этап 2</span>
+          <span className="status-badge">Этап 3</span>
           <h2>{inspectorTabs.find((tab) => tab.id === inspectorTab)?.label}</h2>
           {inspectorTab === 'properties' ? (
             canvasState.selected ? (
@@ -277,13 +314,24 @@ export function EditorShell() {
               <p>Выберите объект на холсте, чтобы увидеть его координаты и размеры.</p>
             )
           ) : inspectorTab === 'layers' ? (
-            <div className="canvas-layer-summary">
-              <p>Объекты остаются независимыми и сериализуются в собственную модель проекта.</p>
-              <div className={canvasState.selected ? 'is-selected' : ''}>
-                <Shapes size={14} />
-                <span>{canvasState.selected?.name ?? 'Объект не выбран'}</span>
-              </div>
-            </div>
+            <LayerPanel
+              layers={canvasState.layers}
+              selectedIds={canvasState.selectedIds}
+              onSelect={(ids) => canvasRef.current?.selectLayers(ids)}
+              onRename={(id, name) => canvasRef.current?.renameLayer(id, name)}
+              onToggleVisibility={(id) => canvasRef.current?.toggleLayerVisibility(id)}
+              onToggleLock={(id) => canvasRef.current?.toggleLayerLock(id)}
+              onDuplicate={(id) => canvasRef.current?.duplicateLayer(id)}
+              onDelete={(id) => {
+                if (window.confirm('Удалить выбранный слой и его содержимое?')) {
+                  canvasRef.current?.deleteLayer(id);
+                }
+              }}
+              onMove={(id, direction) => canvasRef.current?.moveLayer(id, direction)}
+              onReorder={(id, targetId) => canvasRef.current?.reorderLayer(id, targetId)}
+              onGroup={(ids) => canvasRef.current?.groupLayers(ids)}
+              onUngroup={(id) => canvasRef.current?.ungroupLayer(id)}
+            />
           ) : (
             <p>Раздел будет подключён на соответствующем этапе. Сейчас он не имитирует работу.</p>
           )}
@@ -297,18 +345,22 @@ export function EditorShell() {
         </div>
       </aside>
 
-      <footer className="page-strip" aria-label="Страницы альбома">
-        <div className="page-thumbnail is-active">
-          <div>
-            <span>V</span>
-          </div>
-          <small>Обложка</small>
-        </div>
-        <button type="button" className="add-page" disabled title="Будет добавлено позже">
-          <span>+</span>
-          <small>Страница</small>
-        </button>
-      </footer>
+      <PageStrip
+        groups={pageState.groups}
+        activeGroupId={pageState.activeGroupId}
+        layerCountByPage={pageState.layerCountByPage}
+        layersByPage={pageState.layersByPage}
+        onSelect={(id) => canvasRef.current?.selectPageGroup(id)}
+        onAddPage={() => canvasRef.current?.addPage()}
+        onAddSpread={() => canvasRef.current?.addSpread()}
+        onDuplicate={(id) => canvasRef.current?.duplicatePageGroup(id)}
+        onDelete={(id) => {
+          if (window.confirm('Удалить страницу или разворот вместе со слоями?')) {
+            canvasRef.current?.deletePageGroup(id);
+          }
+        }}
+        onMove={(id, direction) => canvasRef.current?.movePageGroup(id, direction)}
+      />
     </div>
   );
 }

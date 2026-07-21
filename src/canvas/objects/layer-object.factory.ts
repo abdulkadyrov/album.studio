@@ -10,6 +10,9 @@ import {
 export type VakhaFabricObject = FabricObject & {
   vakhaId?: string;
   vakhaName?: string;
+  vakhaPageId?: string;
+  vakhaParentId?: string;
+  vakhaZIndex?: number;
   vakhaRole?: 'content' | 'decoration';
 };
 
@@ -23,9 +26,13 @@ const selectionStyle = {
   padding: 2,
 } as const;
 
-export function createFabricObject(snapshot: CanvasObjectSnapshot): VakhaFabricObject {
+export function createFabricObject(
+  snapshot: CanvasObjectSnapshot,
+  pageOffsetMm = 0,
+): VakhaFabricObject {
+  if (snapshot.kind === 'group') throw new TypeError('Группа не является объектом Fabric');
   const sharedOptions = {
-    left: millimetersToLogicalPixels(snapshot.xMm),
+    left: millimetersToLogicalPixels(snapshot.xMm + pageOffsetMm),
     top: millimetersToLogicalPixels(snapshot.yMm),
     angle: snapshot.rotationDeg,
     fill: snapshot.fill,
@@ -36,6 +43,9 @@ export function createFabricObject(snapshot: CanvasObjectSnapshot): VakhaFabricO
     originY: 'top' as const,
     lockSkewingX: true,
     lockSkewingY: true,
+    visible: snapshot.visible,
+    selectable: !snapshot.locked,
+    evented: !snapshot.locked,
     ...selectionStyle,
   };
 
@@ -56,6 +66,9 @@ export function createFabricObject(snapshot: CanvasObjectSnapshot): VakhaFabricO
 
   object.vakhaId = snapshot.id;
   object.vakhaName = snapshot.name;
+  object.vakhaPageId = snapshot.pageId;
+  object.vakhaParentId = snapshot.parentId;
+  object.vakhaZIndex = snapshot.zIndex;
   object.vakhaRole = 'content';
   return object;
 }
@@ -63,12 +76,13 @@ export function createFabricObject(snapshot: CanvasObjectSnapshot): VakhaFabricO
 export function applySnapshotToFabricObject(
   object: VakhaFabricObject,
   snapshot: CanvasObjectSnapshot,
+  pageOffsetMm = 0,
 ): void {
   const width = millimetersToLogicalPixels(snapshot.widthMm);
   const height = millimetersToLogicalPixels(snapshot.heightMm);
 
   object.set({
-    left: millimetersToLogicalPixels(snapshot.xMm),
+    left: millimetersToLogicalPixels(snapshot.xMm + pageOffsetMm),
     top: millimetersToLogicalPixels(snapshot.yMm),
     angle: snapshot.rotationDeg,
     fill: snapshot.fill,
@@ -77,7 +91,14 @@ export function applySnapshotToFabricObject(
     opacity: snapshot.opacity,
     scaleX: 1,
     scaleY: 1,
+    visible: snapshot.visible,
+    selectable: !snapshot.locked,
+    evented: !snapshot.locked,
   });
+
+  object.vakhaName = snapshot.name;
+  object.vakhaParentId = snapshot.parentId;
+  object.vakhaZIndex = snapshot.zIndex;
 
   if (object instanceof Ellipse) {
     object.set({ rx: width / 2, ry: height / 2 });
@@ -88,14 +109,22 @@ export function applySnapshotToFabricObject(
   object.setCoords();
 }
 
-export function fabricObjectToSnapshot(object: VakhaFabricObject): CanvasObjectSnapshot {
+export function fabricObjectToSnapshot(
+  object: VakhaFabricObject,
+  pageOffsetMm = 0,
+): CanvasObjectSnapshot {
   const kind = object instanceof Ellipse ? 'circle' : 'rect';
 
   return {
     id: object.vakhaId ?? crypto.randomUUID(),
+    pageId: object.vakhaPageId ?? 'unknown-page',
+    parentId: object.vakhaParentId,
     name: object.vakhaName ?? 'Объект',
     kind,
-    xMm: roundMillimeters(logicalPixelsToMillimeters(object.left ?? 0)),
+    visible: object.visible,
+    locked: !object.selectable,
+    zIndex: object.vakhaZIndex ?? 0,
+    xMm: roundMillimeters(logicalPixelsToMillimeters(object.left ?? 0) - pageOffsetMm),
     yMm: roundMillimeters(logicalPixelsToMillimeters(object.top ?? 0)),
     widthMm: Math.max(
       0.1,
