@@ -1229,6 +1229,29 @@
   background: var(--danger);
 }
 
+.editor-mode-switch {
+  display: inline-flex;
+  align-items: center;
+  min-width: 154px;
+  height: 32px;
+  padding: 0 8px;
+  gap: 6px;
+  color: var(--text-secondary);
+  background: var(--bg-app);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+}
+
+.editor-mode-switch select {
+  min-width: 0;
+  max-width: 168px;
+  color: var(--text-primary);
+  background: transparent;
+  border: 0;
+  font-size: 10px;
+  font-weight: 700;
+}
+
 .zoom-toolbar {
   display: flex;
   align-items: center;
@@ -1523,6 +1546,48 @@
   display: block;
   margin-bottom: 10px;
   font-size: 11px;
+}
+
+.binding-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.binding-panel > strong {
+  font-size: 12px;
+}
+
+.binding-panel dl {
+  display: grid;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.binding-panel dl div {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  align-items: center;
+  min-height: 32px;
+  padding: 0 10px;
+  gap: 10px;
+  background: var(--bg-control);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+}
+
+.binding-panel dt {
+  color: var(--text-muted);
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.binding-panel dd {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .object-properties dl {

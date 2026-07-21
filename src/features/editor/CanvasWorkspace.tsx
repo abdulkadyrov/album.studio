@@ -32,6 +32,7 @@ import {
 import { canvasSceneRepository } from '../../data/repositories/canvas-scene-repository';
 import { fontRepository, type FontAsset } from '../../data/repositories/font-repository';
 import { imageRepository, type ImageAsset } from '../../data/repositories/image-repository';
+import { personalizationRepository } from '../../data/repositories/personalization-repository';
 import {
   templateRepository,
   type SaveTemplateInput,
@@ -99,6 +100,8 @@ export interface CanvasWorkspaceHandle {
 
 interface CanvasWorkspaceProps {
   projectId: string;
+  editMode?: 'template' | 'participant';
+  participantId?: string;
   tool: CanvasTool;
   gridVisible: boolean;
   snappingEnabled: boolean;
@@ -112,6 +115,8 @@ interface CanvasWorkspaceProps {
 function CanvasWorkspaceComponent(
   {
     projectId,
+    editMode = 'template',
+    participantId,
     tool,
     gridVisible,
     snappingEnabled,
@@ -127,6 +132,7 @@ function CanvasWorkspaceComponent(
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const controllerRef = useRef<CanvasController>();
   const documentRef = useRef<CanvasDocument>();
+  const baseDocumentRef = useRef<CanvasDocument>();
   const activePageIdRef = useRef<string>();
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const initialOptionsRef = useRef({ tool, gridVisible, snappingEnabled });
@@ -190,13 +196,21 @@ function CanvasWorkspaceComponent(
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(() => {
         onSaveStatusChange('saving');
-        void canvasSceneRepository
-          .save(document)
+        const persist =
+          editMode === 'participant' && participantId && baseDocumentRef.current
+            ? personalizationRepository.saveParticipantView(
+                projectId,
+                participantId,
+                baseDocumentRef.current,
+                document,
+              )
+            : canvasSceneRepository.save(document);
+        void persist
           .then(() => onSaveStatusChange('saved'))
           .catch(() => onSaveStatusChange('error'));
       }, 280);
     },
-    [onSaveStatusChange],
+    [editMode, onSaveStatusChange, participantId, projectId],
   );
 
   const applyDocument = useCallback(
@@ -351,8 +365,14 @@ function CanvasWorkspaceComponent(
       try {
         const fonts = await fontRegistry.initialize();
         onFontStateChange({ fonts });
-        const document =
+        const baseDocument =
           (await canvasSceneRepository.load(projectId)) ?? createDefaultCanvasDocument(projectId);
+        const personalized =
+          editMode === 'participant' && participantId
+            ? await personalizationRepository.getParticipantView(projectId, participantId)
+            : undefined;
+        const document = personalized?.viewDocument ?? baseDocument;
+        baseDocumentRef.current = personalized?.baseDocument ?? baseDocument;
         const imageAssets = await imageObjectUrlRegistry.initialize(
           projectId,
           document.layers.flatMap((layer) =>
@@ -422,13 +442,34 @@ function CanvasWorkspaceComponent(
       resizeObserver?.disconnect();
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       const pendingDocument = documentRef.current;
-      if (pendingDocument) void canvasSceneRepository.save(pendingDocument);
+      const baseDocument = baseDocumentRef.current;
+      if (pendingDocument) {
+        if (editMode === 'participant' && participantId && baseDocument) {
+          void personalizationRepository.saveParticipantView(
+            projectId,
+            participantId,
+            baseDocument,
+            pendingDocument,
+          );
+        } else {
+          void canvasSceneRepository.save(pendingDocument);
+        }
+      }
       const controller = controllerRef.current;
       controllerRef.current = undefined;
       if (controller) void controller.dispose();
       imageObjectUrlRegistry.clear();
     };
-  }, [emitPageState, onFontStateChange, onImageStateChange, onStateChange, projectId, queueSave]);
+  }, [
+    editMode,
+    emitPageState,
+    onFontStateChange,
+    onImageStateChange,
+    onStateChange,
+    participantId,
+    projectId,
+    queueSave,
+  ]);
 
   useEffect(() => controllerRef.current?.setTool(tool), [tool]);
   useEffect(() => controllerRef.current?.setGridVisible(gridVisible), [gridVisible]);

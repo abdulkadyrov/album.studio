@@ -64,9 +64,15 @@ describe('layer object factory', () => {
     };
 
     const object = createFabricObject(textLayer);
+    const restored = fabricObjectToSnapshot(object);
 
     expect(object.get('text')).toBe('НАШ ДРУЖНЫЙ КЛАСС');
-    expect(fabricObjectToSnapshot(object)).toEqual(textLayer);
+    expect(restored).toMatchObject({
+      ...textLayer,
+      heightMm: restored.heightMm,
+      text: textLayer.text,
+    });
+    expect(restored.heightMm).toBeLessThan(textLayer.heightMm);
   });
 
   it('сохраняет параметры изображения даже без доступного локального оригинала', () => {

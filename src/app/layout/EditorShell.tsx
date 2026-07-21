@@ -22,6 +22,7 @@ import {
   Table2,
   Type,
   Undo2,
+  UserRound,
   ZoomIn,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -45,6 +46,10 @@ import { TextPropertiesPanel } from '../../features/editor/TextPropertiesPanel';
 import { ImagePropertiesPanel } from '../../features/editor/ImagePropertiesPanel';
 import type { CanvasControllerState, CanvasTool } from '../../canvas/engine/CanvasController';
 import type { SaveStatus } from '../../stores/project-store';
+import {
+  participantRepository,
+  type ParticipantWithPhotos,
+} from '../../data/repositories/participant-repository';
 
 interface EditorToolDefinition {
   id?: CanvasTool | 'zoom' | 'text' | 'photo' | 'frame' | 'shape' | 'decor' | 'background';
@@ -111,6 +116,9 @@ export function EditorShell() {
   });
   const [fontState, setFontState] = useState<FontWorkspaceState>({ fonts: [] });
   const [imageState, setImageState] = useState<ImageWorkspaceState>({ assets: [] });
+  const [participants, setParticipants] = useState<ParticipantWithPhotos[]>([]);
+  const [editMode, setEditMode] = useState<'template' | 'participant'>('template');
+  const [selectedParticipantId, setSelectedParticipantId] = useState('');
 
   const handleCanvasState = useCallback((state: CanvasControllerState) => {
     setCanvasState(state);
@@ -131,6 +139,19 @@ export function EditorShell() {
   const handleImageState = useCallback((state: ImageWorkspaceState) => {
     setImageState(state);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void participantRepository.list(projectId).then((nextParticipants) => {
+      if (!cancelled) {
+        setParticipants(nextParticipants);
+        if (nextParticipants.length === 0) setEditMode('template');
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
 
   useEffect(() => {
     const handlePageNavigation = (event: KeyboardEvent) => {
@@ -192,6 +213,14 @@ export function EditorShell() {
     error: 'Ошибка сохранения',
   };
 
+  const effectiveParticipantId = participants.some((person) => person.id === selectedParticipantId)
+    ? selectedParticipantId
+    : (participants[0]?.id ?? '');
+  const selectedParticipant = participants.find((person) => person.id === effectiveParticipantId);
+  const participantLabel = (person: ParticipantWithPhotos) =>
+    person.displayName ||
+    [person.lastName, person.firstName, person.middleName].filter(Boolean).join(' ');
+
   return (
     <div className="editor-shell" data-accent={accent} data-testid="editor-shell">
       <header className="editor-topbar">
@@ -206,6 +235,33 @@ export function EditorShell() {
           </div>
         </div>
         <div className="editor-topbar__status">
+          <div className="editor-mode-switch" aria-label="Режим редактирования">
+            <UserRound size={14} aria-hidden="true" />
+            <select
+              value={editMode === 'participant' ? effectiveParticipantId : 'template'}
+              onChange={(event) => {
+                if (event.target.value === 'template') {
+                  setEditMode('template');
+                  return;
+                }
+                setSelectedParticipantId(event.target.value);
+                setEditMode('participant');
+                setInspectorTab('bindings');
+              }}
+              title={
+                editMode === 'template'
+                  ? 'Редактируется общий шаблон. Изменения увидят все участники.'
+                  : `Редактируется экземпляр: ${selectedParticipant ? participantLabel(selectedParticipant) : ''}`
+              }
+            >
+              <option value="template">Шаблон</option>
+              {participants.map((person) => (
+                <option key={person.id} value={person.id}>
+                  {participantLabel(person)}
+                </option>
+              ))}
+            </select>
+          </div>
           <span className={`save-indicator save-indicator--${saveStatus}`}>
             <i />
             {saveStatusLabel[saveStatus]}
@@ -346,8 +402,11 @@ export function EditorShell() {
           <span>150</span>
         </div>
         <CanvasWorkspace
+          key={`${projectId}:${editMode}:${editMode === 'participant' ? effectiveParticipantId : 'template'}`}
           ref={canvasRef}
           projectId={projectId}
+          editMode={editMode}
+          participantId={editMode === 'participant' ? effectiveParticipantId : undefined}
           tool={tool}
           gridVisible={gridVisible}
           snappingEnabled={snappingEnabled}
@@ -376,7 +435,7 @@ export function EditorShell() {
           ))}
         </div>
         <div className="inspector-content">
-          <span className="status-badge">Этап 5</span>
+          <span className="status-badge">Этап 8</span>
           <h2>{inspectorTabs.find((tab) => tab.id === inspectorTab)?.label}</h2>
           {inspectorTab === 'properties' ? (
             canvasState.selected ? (
@@ -499,6 +558,42 @@ export function EditorShell() {
                 await canvasRef.current?.toggleFontFavorite(fontId, favorite);
               }}
             />
+          ) : inspectorTab === 'bindings' ? (
+            <div className="binding-panel">
+              <span className="status-badge">Этап 8</span>
+              <strong>
+                {editMode === 'participant'
+                  ? `Экземпляр: ${
+                      selectedParticipant ? participantLabel(selectedParticipant) : 'участник'
+                    }`
+                  : 'Редактируется общий шаблон'}
+              </strong>
+              <p>
+                {editMode === 'participant'
+                  ? 'Изменения записываются как точечные overrides выбранного участника.'
+                  : 'Изменения в шаблоне будут базой для всех участников. Для персональной правки выберите участника в верхней панели.'}
+              </p>
+              {canvasState.selected?.binding ? (
+                <dl>
+                  <div>
+                    <dt>Источник</dt>
+                    <dd>{canvasState.selected.binding.source}</dd>
+                  </div>
+                  <div>
+                    <dt>Поле</dt>
+                    <dd>{canvasState.selected.binding.field}</dd>
+                  </div>
+                  <div>
+                    <dt>Fallback</dt>
+                    <dd>{canvasState.selected.binding.fallback ?? '—'}</dd>
+                  </div>
+                </dl>
+              ) : (
+                <p>
+                  У выбранного слоя нет привязки. Привязки из шаблонов применяются автоматически.
+                </p>
+              )}
+            </div>
           ) : (
             <p>Раздел будет подключён на соответствующем этапе. Сейчас он не имитирует работу.</p>
           )}

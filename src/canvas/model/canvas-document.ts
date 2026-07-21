@@ -200,7 +200,7 @@ export function createDefaultTextStyle(): CanvasTextStyle {
     textCase: 'original',
     paddingMm: 2,
     direction: 'ltr',
-    boxMode: 'fixed',
+    boxMode: 'auto',
     maxLines: 4,
     overflowMode: 'warn',
     shadow: {
