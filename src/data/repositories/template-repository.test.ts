@@ -23,6 +23,16 @@ describe('template repository', () => {
     expect(unchanged?.document.layers[0]?.fill).toBe(source?.document.layers[0]?.fill);
   });
 
+  it('регистрирует большой шаблон по референсам с разворотами', async () => {
+    const source = await templateRepository.get('system-reference-mix-2026');
+
+    expect(source?.template.name).toBe('Выпускной 2026 · микс референсов');
+    expect(source?.document.pages).toHaveLength(12);
+    expect(source?.document.pages.filter((page) => page.spreadId)).toHaveLength(10);
+    expect(source?.document.pages.some((page) => page.repeatFor === 'student')).toBe(true);
+    expect(source?.document.layers.length).toBeGreaterThan(80);
+  });
+
   it('сохраняет отдельную страницу с page type и импортирует свой экспорт', async () => {
     const document = createDefaultCanvasDocument(`template-test-${crypto.randomUUID()}`);
     document.pages[0]!.pageType = 'portrait';
