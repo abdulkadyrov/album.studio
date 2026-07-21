@@ -1,7 +1,6 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 
 import { AppShell } from './layout/AppShell';
-import { EditorShell } from './layout/EditorShell';
 import { NotFoundPage } from '../features/common/NotFoundPage';
 import { ProjectSectionPage } from '../features/common/ProjectSectionPage';
 import { SettingsPage } from '../features/settings/SettingsPage';
@@ -93,7 +92,10 @@ export const router = createBrowserRouter([
   },
   {
     path: '/editor/:projectId',
-    element: <EditorShell />,
+    lazy: async () => {
+      const { EditorShell } = await import('./layout/EditorShell');
+      return { Component: EditorShell };
+    },
   },
   { path: '*', element: <NotFoundPage /> },
 ]);

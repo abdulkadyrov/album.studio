@@ -21,12 +21,13 @@
   },
   "dependencies": {
     "dexie": "4.4.4",
+    "fabric": "7.4.0",
     "lucide-react": "1.25.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-router-dom": "7.18.1",
-    "zustand": "5.0.14",
-    "zod": "4.4.3"
+    "zod": "4.4.3",
+    "zustand": "5.0.14"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

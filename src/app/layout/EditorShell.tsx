@@ -1,14 +1,18 @@
 import {
   ArrowLeft,
-  ChevronDown,
   Download,
   Frame,
+  Grid3X3,
   Hand,
   ImagePlus,
   Layers3,
   Link2,
+  Magnet,
+  Maximize2,
+  Minus,
   MousePointer2,
   Palette,
+  Plus,
   QrCode,
   Redo2,
   Shapes,
@@ -19,16 +23,27 @@ import {
   Undo2,
   ZoomIn,
 } from 'lucide-react';
-import { useState } from 'react';
+import type { LucideIcon } from 'lucide-react';
+import { useCallback, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { Button } from '../../components/ui/Button';
 import { IconButton } from '../../components/ui/IconButton';
 import { routes } from '../routes';
 import { useUiStore } from '../../stores/ui-store';
+import { CanvasWorkspace, type CanvasWorkspaceHandle } from '../../features/editor/CanvasWorkspace';
+import type { CanvasControllerState, CanvasTool } from '../../canvas/engine/CanvasController';
+import type { SaveStatus } from '../../stores/project-store';
 
-const tools = [
-  { label: 'Выделение', icon: MousePointer2, active: true },
+interface EditorToolDefinition {
+  id?: CanvasTool | 'zoom';
+  label: string;
+  icon: LucideIcon;
+  enabled?: boolean;
+}
+
+const tools: readonly EditorToolDefinition[] = [
+  { id: 'select', label: 'Выделение', icon: MousePointer2, enabled: true },
   { label: 'Текст', icon: Type },
   { label: 'Фото', icon: ImagePlus },
   { label: 'Фоторамка', icon: Frame },
@@ -37,8 +52,8 @@ const tools = [
   { label: 'Фон', icon: Palette },
   { label: 'QR-код', icon: QrCode },
   { label: 'Таблица', icon: Table2 },
-  { label: 'Рука', icon: Hand },
-  { label: 'Масштаб', icon: ZoomIn },
+  { id: 'pan', label: 'Рука', icon: Hand, enabled: true },
+  { id: 'zoom', label: 'Масштаб', icon: ZoomIn, enabled: true },
 ] as const;
 
 const inspectorTabs = [
@@ -55,6 +70,44 @@ export function EditorShell() {
   const navigate = useNavigate();
   const accent = useUiStore((state) => state.accent);
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>('layers');
+  const canvasRef = useRef<CanvasWorkspaceHandle>(null);
+  const [tool, setTool] = useState<CanvasTool>('select');
+  const [gridVisible, setGridVisible] = useState(true);
+  const [snappingEnabled, setSnappingEnabled] = useState(true);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
+  const [canvasState, setCanvasState] = useState<CanvasControllerState>({
+    zoom: 1,
+    viewportX: 0,
+    viewportY: 0,
+    canUndo: false,
+    canRedo: false,
+  });
+
+  const handleCanvasState = useCallback((state: CanvasControllerState) => {
+    setCanvasState(state);
+  }, []);
+
+  const handleSaveStatus = useCallback((status: SaveStatus) => {
+    setSaveStatus(status);
+  }, []);
+
+  const selectTool = (id?: string) => {
+    if (id === 'select' || id === 'pan') setTool(id);
+    if (id === 'zoom') canvasRef.current?.fit();
+  };
+
+  const resetCanvas = () => {
+    if (window.confirm('Сбросить расположение демонстрационных объектов?')) {
+      canvasRef.current?.reset();
+    }
+  };
+
+  const saveStatusLabel: Record<SaveStatus, string> = {
+    saved: 'Сохранено локально',
+    dirty: 'Есть изменения',
+    saving: 'Сохранение…',
+    error: 'Ошибка сохранения',
+  };
 
   return (
     <div className="editor-shell" data-accent={accent} data-testid="editor-shell">
@@ -70,15 +123,54 @@ export function EditorShell() {
           </div>
         </div>
         <div className="editor-topbar__status">
-          <span className="save-indicator">
+          <span className={`save-indicator save-indicator--${saveStatus}`}>
             <i />
-            Сохранено локально
+            {saveStatusLabel[saveStatus]}
           </span>
-          <IconButton label="Отменить" icon={<Undo2 size={16} />} comingSoon />
-          <IconButton label="Повторить" icon={<Redo2 size={16} />} comingSoon />
-          <button className="zoom-control" type="button" disabled title="Будет добавлено позже">
-            73% <ChevronDown size={13} />
-          </button>
+          <IconButton
+            label={canvasState.undoLabel ? `Отменить: ${canvasState.undoLabel}` : 'Отменить'}
+            icon={<Undo2 size={16} />}
+            disabled={!canvasState.canUndo}
+            onClick={() => canvasRef.current?.undo()}
+          />
+          <IconButton
+            label={canvasState.redoLabel ? `Повторить: ${canvasState.redoLabel}` : 'Повторить'}
+            icon={<Redo2 size={16} />}
+            disabled={!canvasState.canRedo}
+            onClick={() => canvasRef.current?.redo()}
+          />
+          <div className="zoom-toolbar" aria-label="Масштаб холста">
+            <IconButton
+              label="Уменьшить"
+              icon={<Minus size={14} />}
+              onClick={() => canvasRef.current?.zoomOut()}
+            />
+            <button className="zoom-control" type="button" onClick={() => canvasRef.current?.fit()}>
+              {Math.round(canvasState.zoom * 100)}%
+            </button>
+            <IconButton
+              label="Увеличить"
+              icon={<Plus size={14} />}
+              onClick={() => canvasRef.current?.zoomIn()}
+            />
+            <IconButton
+              label="Уместить разворот"
+              icon={<Maximize2 size={14} />}
+              onClick={() => canvasRef.current?.fit()}
+            />
+          </div>
+          <IconButton
+            label="Показать сетку"
+            icon={<Grid3X3 size={15} />}
+            active={gridVisible}
+            onClick={() => setGridVisible((value) => !value)}
+          />
+          <IconButton
+            label="Привязка к сетке"
+            icon={<Magnet size={15} />}
+            active={snappingEnabled}
+            onClick={() => setSnappingEnabled((value) => !value)}
+          />
         </div>
         <Button
           variant="primary"
@@ -90,19 +182,23 @@ export function EditorShell() {
       </header>
 
       <aside className="editor-tools" aria-label="Инструменты редактора">
-        {tools.map(({ label, icon: Icon, active }) => (
-          <button
-            key={label}
-            className={`tool-button ${active ? 'is-active' : ''}`}
-            type="button"
-            aria-label={label}
-            title={active ? label : `${label} — будет добавлено позже`}
-            disabled={!active}
-          >
-            <Icon size={18} strokeWidth={1.65} aria-hidden="true" />
-            <span>{label}</span>
-          </button>
-        ))}
+        {tools.map(({ label, icon: Icon, id, enabled = false }) => {
+          const isActive = id === tool;
+          return (
+            <button
+              key={label}
+              className={`tool-button ${isActive ? 'is-active' : ''}`}
+              type="button"
+              aria-label={label}
+              title={enabled ? label : `${label} — будет добавлено позже`}
+              disabled={!enabled}
+              onClick={() => selectTool(id)}
+            >
+              <Icon size={18} strokeWidth={1.65} aria-hidden="true" />
+              <span>{label}</span>
+            </button>
+          );
+        })}
       </aside>
 
       <main className="editor-workspace">
@@ -120,22 +216,15 @@ export function EditorShell() {
           <span>100</span>
           <span>150</span>
         </div>
-        <section className="canvas-stage" aria-label="Область будущего холста">
-          <div className="spread-placeholder">
-            <div className="spread-placeholder__page">
-              <span className="canvas-kicker">VAKHA ALBUM DESIGNER</span>
-              <strong>Обложка</strong>
-              <p>Логический холст будет подключён на этапе 2</p>
-              <span className="safe-zone" aria-hidden="true" />
-            </div>
-            <div className="spread-placeholder__page spread-placeholder__page--right">
-              <span className="canvas-kicker">ПРОЕКТ СОХРАНЯЕТСЯ ЛОКАЛЬНО</span>
-              <strong>Новый альбом</strong>
-              <p>Выберите инструмент после подключения canvas engine</p>
-              <span className="safe-zone" aria-hidden="true" />
-            </div>
-          </div>
-        </section>
+        <CanvasWorkspace
+          ref={canvasRef}
+          projectId={projectId}
+          tool={tool}
+          gridVisible={gridVisible}
+          snappingEnabled={snappingEnabled}
+          onStateChange={handleCanvasState}
+          onSaveStatusChange={handleSaveStatus}
+        />
       </main>
 
       <aside className="editor-inspector">
@@ -155,16 +244,55 @@ export function EditorShell() {
           ))}
         </div>
         <div className="inspector-content">
-          <span className="status-badge">Этап 2–5</span>
+          <span className="status-badge">Этап 2</span>
           <h2>{inspectorTabs.find((tab) => tab.id === inspectorTab)?.label}</h2>
-          <p>
-            Панель подключена и готова к предметным контролам. Неработающие свойства не имитируются.
-          </p>
-          <div className="inspector-skeleton" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-            <i />
+          {inspectorTab === 'properties' ? (
+            canvasState.selected ? (
+              <div className="object-properties" data-testid="selection-properties">
+                <strong>{canvasState.selected.name}</strong>
+                <dl>
+                  <div>
+                    <dt>X</dt>
+                    <dd>{canvasState.selected.xMm} мм</dd>
+                  </div>
+                  <div>
+                    <dt>Y</dt>
+                    <dd>{canvasState.selected.yMm} мм</dd>
+                  </div>
+                  <div>
+                    <dt>Ширина</dt>
+                    <dd>{canvasState.selected.widthMm} мм</dd>
+                  </div>
+                  <div>
+                    <dt>Высота</dt>
+                    <dd>{canvasState.selected.heightMm} мм</dd>
+                  </div>
+                  <div>
+                    <dt>Угол</dt>
+                    <dd>{canvasState.selected.rotationDeg}°</dd>
+                  </div>
+                </dl>
+              </div>
+            ) : (
+              <p>Выберите объект на холсте, чтобы увидеть его координаты и размеры.</p>
+            )
+          ) : inspectorTab === 'layers' ? (
+            <div className="canvas-layer-summary">
+              <p>Объекты остаются независимыми и сериализуются в собственную модель проекта.</p>
+              <div className={canvasState.selected ? 'is-selected' : ''}>
+                <Shapes size={14} />
+                <span>{canvasState.selected?.name ?? 'Объект не выбран'}</span>
+              </div>
+            </div>
+          ) : (
+            <p>Раздел будет подключён на соответствующем этапе. Сейчас он не имитирует работу.</p>
+          )}
+          <div className="inspector-stage-actions">
+            <span>Сетка: {gridVisible ? 'включена' : 'скрыта'}</span>
+            <span>Привязка: {snappingEnabled ? 'включена' : 'выключена'}</span>
+            <Button variant="ghost" onClick={resetCanvas}>
+              Сбросить демо-сцену
+            </Button>
           </div>
         </div>
       </aside>

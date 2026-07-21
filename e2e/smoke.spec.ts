@@ -11,7 +11,7 @@ test('основная оболочка и маршруты открываютс
 
   await page.goto('/editor/preview');
   await expect(page.getByTestId('editor-shell')).toBeVisible();
-  await expect(page.getByText('Логический холст будет подключён на этапе 2')).toBeVisible();
+  await expect(page.getByTestId('canvas-workspace')).toHaveAttribute('data-status', 'ready');
 });
 
 test('минимальный настольный размер не создаёт вертикальную прокрутку редактора', async ({
