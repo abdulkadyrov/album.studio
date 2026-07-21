@@ -16,6 +16,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "fixtures:generate": "node scripts/create-test-fixtures.mjs",
+    "profile:large": "node scripts/profile-large-project.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

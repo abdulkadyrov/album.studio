@@ -69,10 +69,30 @@ describe('layer object factory', () => {
     expect(object.get('text')).toBe('НАШ ДРУЖНЫЙ КЛАСС');
     expect(restored).toMatchObject({
       ...textLayer,
+      widthMm: restored.widthMm,
       heightMm: restored.heightMm,
       text: textLayer.text,
     });
+    expect(restored.widthMm).toBeLessThan(textLayer.widthMm);
     expect(restored.heightMm).toBeLessThan(textLayer.heightMm);
+  });
+
+  it('сужает auto-текст до видимой строки и использует реальные пиксели для фигур', () => {
+    const text = createFabricObject({
+      ...fixture,
+      id: 'text-hitbox',
+      kind: 'text',
+      widthMm: 120,
+      heightMm: 40,
+      text: createDefaultTextStyle(),
+    });
+    const circle = createFabricObject({ ...fixture, id: 'circle-hitbox', kind: 'circle' });
+
+    expect(text.perPixelTargetFind).toBe(false);
+    expect(fabricObjectToSnapshot(text).widthMm).toBeLessThan(120);
+    expect(circle.perPixelTargetFind).toBe(true);
+    expect(text.targetFindTolerance).toBe(0);
+    expect(circle.targetFindTolerance).toBe(0);
   });
 
   it('сохраняет параметры изображения даже без доступного локального оригинала', () => {

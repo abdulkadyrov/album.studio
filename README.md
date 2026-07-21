@@ -85,6 +85,8 @@ npm run lint
 npm run test
 npm run build
 npm run test:e2e
+npm run fixtures:generate
+npm run profile:large
 npm run format:check
 ```
 
@@ -127,5 +129,6 @@ Dexie открывает базу `vakha-album-designer` в IndexedDB. PWA Servi
 - [План разработки](./PLAN.md)
 - [Архитектура](./ARCHITECTURE.md)
 - [Roadmap](./ROADMAP.md)
+- [Testing и MVP release checks](./TESTING.md)
 - [Формат шаблонов `.vstemplate`](./TEMPLATE_FORMAT.md)
 - [Форматы данных `.vsclass`, `.vsalbum` и аннотаций](./DATA_FORMATS.md)

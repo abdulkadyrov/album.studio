@@ -101,6 +101,14 @@ function configureTextObject(
     splitByGrapheme: false,
   });
   object.initDimensions();
+  if (text.boxMode === 'auto') {
+    const contentWidth = Math.min(
+      boxWidth - millimetersToLogicalPixels(text.paddingMm) * 2,
+      Math.max(1, object.calcTextWidth()),
+    );
+    object.set({ width: contentWidth });
+    object.initDimensions();
+  }
   let measuredHeight = object.height;
   const initialLineCount = object.textLines.length;
   const overflow = resolveTextOverflow({
@@ -142,7 +150,12 @@ function configureTextObject(
   const textObject = object as Textbox & { _getTopOffset: () => number };
   textObject._getTopOffset = () => -renderedHeight / 2 + verticalOffset;
   object.vakhaText = structuredClone(text);
-  object.vakhaTextWidthMm = snapshot.widthMm;
+  object.vakhaTextWidthMm =
+    text.boxMode === 'auto'
+      ? logicalPixelsToMillimeters(
+          (object.width ?? 0) + millimetersToLogicalPixels(text.paddingMm) * 2,
+        )
+      : snapshot.widthMm;
   object.vakhaTextHeightMm =
     text.boxMode === 'auto' ? logicalPixelsToMillimeters(renderedHeight) : snapshot.heightMm;
   object.vakhaTextOverflow =
@@ -288,6 +301,7 @@ export function createFabricObject(
     visible: snapshot.visible,
     selectable: !snapshot.locked,
     evented: !snapshot.locked,
+    targetFindTolerance: 0,
     ...selectionStyle,
   };
 
@@ -340,6 +354,7 @@ export function createFabricObject(
   object.vakhaLocked = snapshot.locked;
   object.vakhaKind = snapshot.kind;
   object.vakhaRole = 'content';
+  object.perPixelTargetFind = !(object instanceof Textbox);
   return object;
 }
 

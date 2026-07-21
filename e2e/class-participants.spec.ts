@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import JSZip from 'jszip';
+import path from 'node:path';
 import { writeFile } from 'node:fs/promises';
 
 async function makeClassArchive(path: string, assetPath = 'assets/ivanov.jpg') {
@@ -113,4 +114,21 @@ test('инструменты редактора переключают визу�
   await select.click();
   await expect(select).toHaveClass(/is-active/);
   await expect(pan).not.toHaveClass(/is-active/);
+});
+
+test('релизная фикстура .vsclass импортируется без реальных данных', async ({ page }, testInfo) => {
+  const projectId = `fixture-class-${testInfo.project.name}`;
+
+  await page.goto(`/projects/${projectId}/import-class`);
+  await page
+    .getByLabel('Выбрать .vsclass')
+    .setInputFiles(path.resolve('fixtures/test-class.vsclass'));
+  await expect(page.getByText('Ученик1 Имя1')).toBeVisible();
+  await expect(page.getByText('Наставник Мария')).toBeVisible();
+  await page.getByRole('button', { name: 'Записать в проект' }).click();
+  await expect(page.getByRole('status')).toContainText('Импортировано: 9');
+
+  await page.getByRole('link', { name: 'Открыть участников' }).click();
+  await expect(page.getByRole('heading', { name: 'Участники' })).toBeVisible();
+  await expect(page.getByText('Ученик8 Имя8')).toBeVisible();
 });
