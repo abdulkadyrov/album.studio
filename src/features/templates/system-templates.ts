@@ -1216,7 +1216,558 @@ function createReferenceMixTemplate(): TemplateManifest {
   };
 }
 
+function createSpbMarbleTemplate(): TemplateManifest {
+  const id = 'system-spb-marble-2025';
+  const pageTitles = [
+    ['Обложка', 'cover'],
+    ['Портрет ученика', 'portrait'],
+    ['Наша группа', 'group'],
+    ['Наши друзья', 'group'],
+    ['Руководитель', 'teachers'],
+    ['Пожелания', 'universal'],
+    ['Учителя', 'teachers'],
+    ['Портрет выпускника', 'portrait'],
+    ['Достижения', 'events'],
+    ['Спорт', 'events'],
+    ['Творчество', 'events'],
+    ['Прогулки по Петербургу', 'events'],
+    ['Классный коллаж', 'class'],
+    ['Лучшие моменты', 'events'],
+    ['Финальный разворот', 'closing'],
+    ['Последняя страница', 'closing'],
+  ] as const;
+  const pages = pageTitles.map(([title, pageType], index) =>
+    makePage(id, index, title, pageType, pageType === 'portrait' ? 'student' : 'none'),
+  );
+  const page = (index: number) => pages[index]!;
+  const green = '#243522';
+  const text = '#465140';
+  const marble = '#f5f4ef';
+  const photo = '#c9c9c9';
+
+  const marbleBackground = (canvasPage: CanvasPageSnapshot, pageNumber?: number) => [
+    background(id, canvasPage.id, marble),
+    decorativeLayer(
+      id,
+      canvasPage.id,
+      'marble-wash-left',
+      'Мраморная заливка',
+      'rect',
+      1,
+      0,
+      0,
+      40,
+      280,
+      '#e9e7df',
+      0.65,
+    ),
+    decorativeLayer(
+      id,
+      canvasPage.id,
+      'marble-wash-top',
+      'Мраморная заливка',
+      'rect',
+      1,
+      0,
+      0,
+      200,
+      42,
+      '#ffffff',
+      0.55,
+    ),
+    ...Array.from({ length: 7 }, (_, index) =>
+      decorativeLayer(
+        id,
+        canvasPage.id,
+        `marble-vein-${index}`,
+        'Мраморная прожилка',
+        'rect',
+        2,
+        12 + index * 27,
+        26 + (index % 3) * 48,
+        0.45,
+        132,
+        index % 2 ? '#aeb3ad' : '#d8d5cf',
+        0.34,
+        index % 2 ? 36 : -42,
+      ),
+    ),
+    decorativeLayer(
+      id,
+      canvasPage.id,
+      'trim-ready',
+      'Граница готового изделия',
+      'rect',
+      3,
+      3,
+      3,
+      194,
+      274,
+      'transparent',
+      1,
+      0,
+      '#d55b4b',
+      0.35,
+    ),
+    decorativeLayer(
+      id,
+      canvasPage.id,
+      'safe-zone',
+      'Безопасная зона',
+      'rect',
+      3,
+      13,
+      10,
+      174,
+      260,
+      'transparent',
+      1,
+      0,
+      '#6aa060',
+      0.32,
+    ),
+    ...(pageNumber
+      ? [
+          decorativeLayer(
+            id,
+            canvasPage.id,
+            'page-number-block',
+            'Номер страницы',
+            'rect',
+            30,
+            174,
+            258,
+            12,
+            14,
+            green,
+          ),
+          tunedTextLayer(
+            id,
+            canvasPage.id,
+            96,
+            String(pageNumber).padStart(2, '0'),
+            175,
+            260,
+            10,
+            9,
+            '#f5f4ef',
+            'center',
+          ),
+        ]
+      : []),
+  ];
+
+  const pageLabel = (canvasPage: CanvasPageSnapshot, caption: string, right = false) => [
+    decorativeLayer(
+      id,
+      canvasPage.id,
+      'label',
+      'Зелёная плашка раздела',
+      'rect',
+      20,
+      right ? 142 : 0,
+      8,
+      right ? 58 : 66,
+      10,
+      green,
+    ),
+    tunedTextLayer(
+      id,
+      canvasPage.id,
+      90,
+      caption,
+      right ? 146 : 16,
+      9.5,
+      right ? 44 : 46,
+      8,
+      '#f5f4ef',
+      'center',
+    ),
+  ];
+
+  const citySketch = (
+    canvasPage: CanvasPageSnapshot,
+    xMm: number,
+    yMm: number,
+    accent = '#789b9a',
+  ) => [
+    decorativeLayer(
+      id,
+      canvasPage.id,
+      'city-wash',
+      'Акварель под рисунком',
+      'circle',
+      8,
+      xMm,
+      yMm,
+      42,
+      34,
+      accent,
+      0.22,
+    ),
+    tunedTextLayer(id, canvasPage.id, 91, 'СПБ', xMm + 12, yMm + 8, 22, 18, green, 'center', {
+      fontFamily: 'Georgia',
+      fontWeight: '700',
+      letterSpacingEm: 0.08,
+    }),
+    decorativeLayer(
+      id,
+      canvasPage.id,
+      'city-line-a',
+      'Архитектурная линия',
+      'rect',
+      9,
+      xMm + 6,
+      yMm + 26,
+      46,
+      0.7,
+      green,
+      0.45,
+      -18,
+    ),
+    decorativeLayer(
+      id,
+      canvasPage.id,
+      'city-line-b',
+      'Архитектурная линия',
+      'rect',
+      9,
+      xMm + 16,
+      yMm + 18,
+      32,
+      0.7,
+      green,
+      0.45,
+      28,
+    ),
+  ];
+
+  const portraitPage = (canvasPage: CanvasPageSnapshot, pageNumber: number, heading: string) => [
+    ...marbleBackground(canvasPage, pageNumber),
+    ...pageLabel(canvasPage, heading),
+    photoFrame(id, canvasPage.id, 0, 46, 32, 104, 156, photo, 'rectangle'),
+    tunedTextLayer(id, canvasPage.id, 0, 'ФАМИЛИЯ', 46, 200, 96, 16, text, 'left', {
+      fontFamily: 'Georgia',
+      fontWeight: 'normal',
+    }),
+    tunedTextLayer(id, canvasPage.id, 1, 'Имя  Отчество', 46, 217, 96, 14, text, 'left', {
+      fontFamily: 'Georgia',
+    }),
+    ...citySketch(canvasPage, 128, 202),
+  ];
+
+  const collagePage = (
+    canvasPage: CanvasPageSnapshot,
+    pageNumber: number,
+    heading: string,
+    frames: Array<[number, number, number, number]>,
+    quote?: string,
+  ) => [
+    ...marbleBackground(canvasPage, pageNumber),
+    ...pageLabel(canvasPage, heading, pageNumber % 2 === 1),
+    ...frames.map(([x, y, w, h], index) =>
+      photoFrame(id, canvasPage.id, index, x, y, w, h, photo, 'rectangle'),
+    ),
+    ...(quote
+      ? [
+          tunedTextLayer(id, canvasPage.id, 10, quote, 62, 130, 80, 12, text, 'center', {
+            fontFamily: 'serif',
+            fontStyle: 'italic',
+            lineHeight: 1.1,
+          }),
+        ]
+      : []),
+  ];
+
+  const teacherGrid = (canvasPage: CanvasPageSnapshot, pageNumber: number) => [
+    ...marbleBackground(canvasPage, pageNumber),
+    ...pageLabel(canvasPage, 'Учителя'),
+    ...Array.from({ length: 6 }, (_, index) => {
+      const column = index % 3;
+      const row = Math.floor(index / 3);
+      return photoFrame(
+        id,
+        canvasPage.id,
+        index,
+        24 + column * 54,
+        34 + row * 104,
+        42,
+        66,
+        photo,
+        'rectangle',
+      );
+    }),
+    ...Array.from({ length: 6 }, (_, index) => {
+      const column = index % 3;
+      const row = Math.floor(index / 3);
+      return tunedTextLayer(
+        id,
+        canvasPage.id,
+        20 + index,
+        'Фамилия\nИмя Отчество\nпредмет',
+        24 + column * 54,
+        103 + row * 104,
+        42,
+        8.5,
+        text,
+        'center',
+        {
+          lineHeight: 1.05,
+        },
+      );
+    }),
+  ];
+
+  const layers: CanvasLayerSnapshot[] = [
+    background(id, page(0).id, green),
+    decorativeLayer(id, page(0).id, 'cover-spine', 'Корешок', 'rect', 2, 0, 0, 96, 280, '#1f301f'),
+    decorativeLayer(
+      id,
+      page(0).id,
+      'cover-safe',
+      'Безопасная зона',
+      'rect',
+      3,
+      12,
+      15,
+      176,
+      250,
+      'transparent',
+      1,
+      0,
+      '#5d8758',
+      0.35,
+    ),
+    decorativeLayer(
+      id,
+      page(0).id,
+      'cover-seam-a',
+      'Линия корешка',
+      'rect',
+      4,
+      96,
+      0,
+      0.6,
+      280,
+      '#97a58e',
+      0.7,
+    ),
+    decorativeLayer(
+      id,
+      page(0).id,
+      'cover-seam-b',
+      'Линия корешка',
+      'rect',
+      4,
+      103,
+      0,
+      0.6,
+      280,
+      '#97a58e',
+      0.55,
+    ),
+    tunedTextLayer(id, page(0).id, 0, 'Вы\nпус\nк', 106, 48, 74, 86, '#f5f4ef', 'center', {
+      fontFamily: 'Georgia',
+      fontSizePt: 70,
+      lineHeight: 0.82,
+    }),
+    tunedTextLayer(id, page(0).id, 1, '2025', 160, 104, 18, 25, '#f5f4ef', 'center', {
+      fontFamily: 'Georgia',
+      letterSpacingEm: 0.08,
+    }),
+    tunedTextLayer(id, page(0).id, 2, 'Санкт-Петербург', 122, 248, 56, 10, '#f5f4ef', 'center'),
+
+    ...portraitPage(page(1), 1, 'Выпускник'),
+    ...collagePage(
+      page(2),
+      2,
+      'Наша группа',
+      [
+        [30, 34, 128, 82],
+        [28, 132, 74, 96],
+        [110, 154, 62, 74],
+      ],
+      'Славные времена,\nпроведённые вместе',
+    ),
+    ...collagePage(
+      page(3),
+      3,
+      'Наша группа',
+      [
+        [30, 34, 76, 100],
+        [112, 28, 60, 108],
+        [30, 162, 76, 66],
+        [116, 148, 56, 82],
+      ],
+      'Спасибо за подаренное\nвдохновение!',
+    ),
+    ...portraitPage(page(4), 4, 'Руководитель'),
+    ...marbleBackground(page(5), 5),
+    ...pageLabel(page(5), 'Пожелания', true),
+    decorativeLayer(
+      id,
+      page(5).id,
+      'wish-paper',
+      'Поле для пожеланий',
+      'rect',
+      6,
+      26,
+      36,
+      148,
+      200,
+      '#ffffff',
+      0.62,
+    ),
+    ...Array.from({ length: 22 }, (_, index) =>
+      decorativeLayer(
+        id,
+        page(5).id,
+        `wish-line-${index}`,
+        'Строка пожеланий',
+        'rect',
+        7,
+        33,
+        48 + index * 8,
+        134,
+        0.28,
+        '#bfc5bd',
+        0.75,
+      ),
+    ),
+    ...teacherGrid(page(6), 6),
+    ...portraitPage(page(7), 7, 'Выпускник'),
+    ...collagePage(
+      page(8),
+      8,
+      'Достижения',
+      [
+        [24, 32, 68, 88],
+        [106, 32, 68, 88],
+        [24, 142, 68, 88],
+        [106, 142, 68, 88],
+      ],
+      'Наши победы',
+    ),
+    ...collagePage(page(9), 10, 'Спорт', [
+      [24, 30, 70, 104],
+      [106, 30, 70, 104],
+      [24, 146, 70, 90],
+      [106, 146, 70, 90],
+    ]),
+    ...citySketch(page(9), 132, 210, '#5aa3a1'),
+    ...collagePage(
+      page(10),
+      11,
+      'Творчество',
+      [
+        [26, 32, 58, 76],
+        [96, 30, 78, 54],
+        [24, 128, 70, 98],
+        [106, 112, 66, 112],
+      ],
+      'Каждый талант\nзвучит по‑своему',
+    ),
+    ...collagePage(page(11), 12, 'Петербург', [
+      [22, 34, 72, 90],
+      [106, 34, 72, 90],
+      [22, 148, 156, 72],
+    ]),
+    ...citySketch(page(11), 66, 210, '#b36b5d'),
+    ...collagePage(
+      page(12),
+      13,
+      'Наш класс',
+      [
+        [20, 34, 48, 62],
+        [76, 34, 48, 62],
+        [132, 34, 48, 62],
+        [20, 118, 48, 62],
+        [76, 118, 48, 62],
+        [132, 118, 48, 62],
+      ],
+      'Вместе — сильнее',
+    ),
+    ...collagePage(page(13), 14, 'Моменты', [
+      [24, 30, 150, 72],
+      [24, 116, 68, 94],
+      [106, 116, 68, 94],
+    ]),
+    ...collagePage(
+      page(14),
+      15,
+      'Финал',
+      [
+        [24, 34, 150, 92],
+        [40, 150, 120, 66],
+      ],
+      'Впереди — новый город,\nновые маршруты,\nновые мы',
+    ),
+    ...marbleBackground(page(15), 16),
+    tunedTextLayer(
+      id,
+      page(15).id,
+      0,
+      'ДО ВСТРЕЧИ\nВ НОВОЙ ИСТОРИИ',
+      32,
+      78,
+      136,
+      30,
+      green,
+      'center',
+      {
+        fontFamily: 'Georgia',
+        fontWeight: '700',
+        lineHeight: 1.05,
+      },
+    ),
+    tunedTextLayer(id, page(15).id, 1, 'Санкт-Петербург · 2025', 44, 156, 112, 12, text, 'center'),
+    ...citySketch(page(15), 76, 186),
+  ];
+
+  for (const layer of layers) {
+    if (layer.kind === 'frame' && layer.pageId === page(1).id) {
+      layer.binding = {
+        source: 'participant',
+        field: 'photoAssetId',
+        fallback: `${id}:placeholder`,
+      };
+    }
+    if (layer.kind === 'text' && layer.pageId === page(1).id && layer.name === 'ФАМИЛИЯ') {
+      layer.binding = { source: 'participant', field: 'lastName', fallback: 'ФАМИЛИЯ' };
+    }
+  }
+
+  const document: CanvasDocument = {
+    version: 2,
+    projectId: id,
+    pages,
+    layers,
+    updatedAt: createdAt,
+  };
+  return {
+    format: 'vakha-template',
+    version: 1,
+    template: {
+      id,
+      name: 'Санкт-Петербург · мрамор',
+      description:
+        'Светлый выпускной шаблон по референсу генератора: мрамор, зелёные разделы, портреты, группы, учителя, пожелания и события.',
+      category: 'grade-11',
+      style: 'classic',
+      color: 'green',
+      orientation: 'portrait',
+      source: 'system',
+      favorite: false,
+      createdAt,
+      updatedAt: createdAt,
+    },
+    document,
+    assets: [],
+  };
+}
+
 export const systemTemplates: TemplateManifest[] = [
+  createSpbMarbleTemplate(),
   createReferenceMixTemplate(),
   createSystemTemplate({
     id: 'system-editorial-red',

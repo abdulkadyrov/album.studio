@@ -234,6 +234,44 @@ function createFrameClip(
   });
 }
 
+function drawPlaceholderUploadButton(object: Rect): void {
+  const rect = object as Rect & { _render: (context: CanvasRenderingContext2D) => void };
+  const renderRect = rect._render.bind(rect);
+  rect._render = (context) => {
+    renderRect(context);
+    const width = object.width ?? 0;
+    const height = object.height ?? 0;
+    const buttonWidth = Math.max(28, Math.min(46, width * 0.34));
+    const buttonHeight = Math.max(22, Math.min(34, height * 0.22));
+    const x = -buttonWidth / 2;
+    const y = -buttonHeight / 2;
+    context.save();
+    context.fillStyle = '#0b8fff';
+    context.beginPath();
+    context.roundRect(x, y, buttonWidth, buttonHeight, 4);
+    context.fill();
+    context.strokeStyle = '#ffffff';
+    context.lineWidth = 2;
+    context.strokeRect(
+      x + buttonWidth * 0.28,
+      y + buttonHeight * 0.25,
+      buttonWidth * 0.44,
+      buttonHeight * 0.42,
+    );
+    context.beginPath();
+    context.moveTo(x + buttonWidth * 0.34, y + buttonHeight * 0.58);
+    context.lineTo(x + buttonWidth * 0.45, y + buttonHeight * 0.45);
+    context.lineTo(x + buttonWidth * 0.56, y + buttonHeight * 0.58);
+    context.lineTo(x + buttonWidth * 0.66, y + buttonHeight * 0.5);
+    context.stroke();
+    context.beginPath();
+    context.arc(x + buttonWidth * 0.6, y + buttonHeight * 0.34, 1.8, 0, Math.PI * 2);
+    context.fillStyle = '#ffffff';
+    context.fill();
+    context.restore();
+  };
+}
+
 function configureImageObject(
   object: FabricImage & VakhaFabricObject,
   snapshot: CanvasObjectSnapshot,
@@ -312,13 +350,16 @@ export function createFabricObject(
     configureImageObject(fabricImage, snapshot, svgMaskElement);
     object = fabricImage;
   } else if (snapshot.image) {
-    object = new Rect({
+    const placeholder = new Rect({
       ...sharedOptions,
       width: millimetersToLogicalPixels(snapshot.widthMm),
       height: millimetersToLogicalPixels(snapshot.heightMm),
       fill: snapshot.fill,
       strokeDashArray: [10, 6],
     });
+    drawPlaceholderUploadButton(placeholder);
+    object = placeholder;
+    object.hoverCursor = 'pointer';
     object.vakhaImage = structuredClone(snapshot.image);
     object.vakhaImageWidthMm = snapshot.widthMm;
     object.vakhaImageHeightMm = snapshot.heightMm;

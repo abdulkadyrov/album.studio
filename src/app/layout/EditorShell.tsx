@@ -90,7 +90,9 @@ export function EditorShell() {
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>('layers');
   const canvasRef = useRef<CanvasWorkspaceHandle>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const frameReplaceInputRef = useRef<HTMLInputElement>(null);
   const pendingImageKindRef = useRef<'image' | 'frame' | 'decoration' | 'background'>('image');
+  const pendingFrameLayerIdRef = useRef<string>();
   const [tool, setTool] = useState<CanvasTool>('select');
   const [activeToolId, setActiveToolId] = useState<EditorToolId>('select');
   const [gridVisible, setGridVisible] = useState(true);
@@ -138,6 +140,14 @@ export function EditorShell() {
 
   const handleImageState = useCallback((state: ImageWorkspaceState) => {
     setImageState(state);
+  }, []);
+
+  const requestFrameReplace = useCallback((layerId: string) => {
+    pendingFrameLayerIdRef.current = layerId;
+    setTool('select');
+    setActiveToolId('select');
+    setInspectorTab('properties');
+    frameReplaceInputRef.current?.click();
   }, []);
 
   useEffect(() => {
@@ -366,6 +376,22 @@ export function EditorShell() {
             event.target.value = '';
           }}
         />
+        <input
+          ref={frameReplaceInputRef}
+          className="sr-only"
+          aria-label="Выбрать фото для рамки"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            const layerId = pendingFrameLayerIdRef.current;
+            pendingFrameLayerIdRef.current = undefined;
+            if (file && layerId) {
+              void canvasRef.current?.replaceImage(layerId, file);
+            }
+            event.target.value = '';
+          }}
+        />
         {tools.map(({ label, icon: Icon, id, enabled = false }) => {
           const isActive = id === activeToolId;
           return (
@@ -415,6 +441,7 @@ export function EditorShell() {
           onFontStateChange={handleFontState}
           onImageStateChange={handleImageState}
           onSaveStatusChange={handleSaveStatus}
+          onFrameReplaceRequest={requestFrameReplace}
         />
       </main>
 

@@ -33,6 +33,20 @@ describe('template repository', () => {
     expect(source?.document.layers.length).toBeGreaterThan(80);
   });
 
+  it('регистрирует мраморный шаблон Санкт-Петербурга из генератора', async () => {
+    const source = await templateRepository.get('system-spb-marble-2025');
+
+    expect(source?.template.name).toBe('Санкт-Петербург · мрамор');
+    expect(source?.document.pages).toHaveLength(16);
+    expect(source?.document.pages.map((page) => page.title)).toEqual(
+      expect.arrayContaining(['Пожелания', 'Учителя', 'Спорт']),
+    );
+    expect(source?.document.layers.some((layer) => layer.name === 'Безопасная зона')).toBe(true);
+    expect(
+      source?.document.layers.filter((layer) => layer.kind === 'frame').length,
+    ).toBeGreaterThan(30);
+  });
+
   it('сохраняет отдельную страницу с page type и импортирует свой экспорт', async () => {
     const document = createDefaultCanvasDocument(`template-test-${crypto.randomUUID()}`);
     document.pages[0]!.pageType = 'portrait';

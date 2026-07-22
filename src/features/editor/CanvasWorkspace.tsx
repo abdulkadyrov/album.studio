@@ -110,6 +110,7 @@ interface CanvasWorkspaceProps {
   onFontStateChange: (state: FontWorkspaceState) => void;
   onImageStateChange: (state: ImageWorkspaceState) => void;
   onSaveStatusChange: (status: SaveStatus) => void;
+  onFrameReplaceRequest?: (layerId: string) => void;
 }
 
 function CanvasWorkspaceComponent(
@@ -125,6 +126,7 @@ function CanvasWorkspaceComponent(
     onFontStateChange,
     onImageStateChange,
     onSaveStatusChange,
+    onFrameReplaceRequest,
   }: CanvasWorkspaceProps,
   ref: ForwardedRef<CanvasWorkspaceHandle>,
 ) {
@@ -417,6 +419,7 @@ function CanvasWorkspaceComponent(
             }
             onStateChange(state);
           },
+          onFrameReplaceRequest,
           isFontAvailable: (family, assetId) => fontRegistry.isAvailable(family, assetId),
           getImageElement: (assetId) => imageObjectUrlRegistry.getElement(assetId),
         });
@@ -465,6 +468,7 @@ function CanvasWorkspaceComponent(
     emitPageState,
     onFontStateChange,
     onImageStateChange,
+    onFrameReplaceRequest,
     onStateChange,
     participantId,
     projectId,

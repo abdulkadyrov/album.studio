@@ -78,6 +78,7 @@ interface CanvasControllerOptions {
   activePageId: string;
   onDocumentChange: (document: CanvasDocument) => void;
   onStateChange: (state: CanvasControllerState) => void;
+  onFrameReplaceRequest?: (layerId: string) => void;
   isFontAvailable?: (family: string, assetId?: string) => boolean;
   getImageElement?: (assetId: string) => HTMLImageElement | undefined;
 }
@@ -98,6 +99,7 @@ export class CanvasController {
   private readonly history: HistoryManager;
   private readonly onDocumentChange: CanvasControllerOptions['onDocumentChange'];
   private readonly onStateChange: CanvasControllerOptions['onStateChange'];
+  private readonly onFrameReplaceRequest: CanvasControllerOptions['onFrameReplaceRequest'];
   private gridObjects: FabricObject[] = [];
   private activeTransformBefore?: CanvasLayerSnapshot;
   private tool: CanvasTool = 'select';
@@ -118,6 +120,7 @@ export class CanvasController {
     this.activePageId = options.activePageId;
     this.onDocumentChange = options.onDocumentChange;
     this.onStateChange = options.onStateChange;
+    this.onFrameReplaceRequest = options.onFrameReplaceRequest;
     this.isFontAvailable = options.isFontAvailable ?? (() => true);
     this.getImageElement = options.getImageElement ?? (() => undefined);
     this.history = new HistoryManager(100, () => this.emitState());
@@ -790,6 +793,17 @@ export class CanvasController {
     this.canvas.on('mouse:up', () => {
       this.releaseViewportDrag();
     });
+
+    this.canvas.on('mouse:dblclick', ({ target }) => this.handleImageFrameDoubleClick(target));
+  }
+
+  private handleImageFrameDoubleClick(object?: VakhaFabricObject): void {
+    const layerId = typeof object?.vakhaId === 'string' ? object.vakhaId : undefined;
+    if (!layerId || object?.vakhaRole !== 'content') return;
+    const layer = this.getLayer(layerId);
+    if (!layer?.image || !['frame', 'image'].includes(layer.kind)) return;
+    this.selectLayers([layer.id]);
+    this.onFrameReplaceRequest?.(layer.id);
   }
 
   private isPointerReleased(event: Event): boolean {

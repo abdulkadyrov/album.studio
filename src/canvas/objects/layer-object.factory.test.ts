@@ -118,4 +118,27 @@ describe('layer object factory', () => {
     expect(restored).toMatchObject(imageLayer);
     expect(restored.image).toEqual(imageLayer.image);
   });
+
+  it('показывает пустую фоторамку как кликабельный плейсхолдер без изменения модели', () => {
+    const imageLayer: CanvasObjectSnapshot = {
+      ...fixture,
+      id: 'empty-frame',
+      kind: 'frame',
+      fill: 'transparent',
+      image: createDefaultImageStyle({
+        assetId: 'missing-image',
+        filename: 'Выберите фото',
+        mimeType: 'image/png',
+        naturalWidthPx: 1200,
+        naturalHeightPx: 1600,
+      }),
+    };
+
+    const object = createFabricObject(imageLayer);
+
+    expect(object.fill).toBe('transparent');
+    expect(object.stroke).toBe('#ffffff');
+    expect(object.hoverCursor).toBe('pointer');
+    expect(fabricObjectToSnapshot(object)).toMatchObject(imageLayer);
+  });
 });
