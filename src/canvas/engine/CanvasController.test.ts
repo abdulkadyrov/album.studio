@@ -9,7 +9,7 @@ type TestFabricCanvas = {
 };
 
 describe('CanvasController', () => {
-  it('отпускает активную трансформацию, если кнопка мыши уже не нажата', async () => {
+  function createController() {
     const documentModel = createDefaultCanvasDocument('sticky-pointer-test');
     const element = document.createElement('canvas');
     document.body.append(element);
@@ -20,6 +20,11 @@ describe('CanvasController', () => {
       onStateChange: vi.fn(),
     });
     const fabricCanvas = (controller as unknown as { canvas: TestFabricCanvas }).canvas;
+    return { controller, element, fabricCanvas };
+  }
+
+  it('отпускает активную трансформацию, если кнопка мыши уже не нажата', async () => {
+    const { controller, element, fabricCanvas } = createController();
     const endCurrentTransform = vi.fn((event: Event) => {
       expect(event.type).toBe('mousemove');
       fabricCanvas._currentTransform = undefined;
@@ -28,6 +33,23 @@ describe('CanvasController', () => {
     fabricCanvas.endCurrentTransform = endCurrentTransform;
 
     window.dispatchEvent(new MouseEvent('mousemove', { buttons: 0 }));
+
+    expect(endCurrentTransform).toHaveBeenCalledOnce();
+    expect(fabricCanvas._currentTransform).toBeUndefined();
+    await controller.dispose();
+    element.remove();
+  });
+
+  it('сбрасывает зависшую трансформацию при смене инструмента', async () => {
+    const { controller, element, fabricCanvas } = createController();
+    const endCurrentTransform = vi.fn((event: Event) => {
+      expect(event.type).toBe('toolchange');
+      fabricCanvas._currentTransform = undefined;
+    });
+    fabricCanvas._currentTransform = { action: 'drag' };
+    fabricCanvas.endCurrentTransform = endCurrentTransform;
+
+    controller.setTool('pan');
 
     expect(endCurrentTransform).toHaveBeenCalledOnce();
     expect(fabricCanvas._currentTransform).toBeUndefined();

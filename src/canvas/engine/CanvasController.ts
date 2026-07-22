@@ -162,6 +162,7 @@ export class CanvasController {
   }
 
   setTool(tool: CanvasTool): void {
+    this.releasePointerInteraction(new Event('toolchange'));
     this.tool = tool;
     this.setContentInteraction(tool === 'select');
     this.canvas.defaultCursor = tool === 'pan' ? 'grab' : 'default';
@@ -780,6 +781,10 @@ export class CanvasController {
       this.canvas.setViewportTransform(transform);
       this.lastPointer = pointer;
       this.canvas.requestRenderAll();
+    });
+
+    this.canvas.on('mouse:up:before', ({ e }) => {
+      this.releasePointerInteraction(e);
     });
 
     this.canvas.on('mouse:up', () => {
