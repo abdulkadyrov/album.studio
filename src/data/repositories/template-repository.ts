@@ -19,17 +19,18 @@ import { canvasSceneRepository } from './canvas-scene-repository';
 
 const MAX_TEMPLATE_BYTES = 500 * 1024 * 1024;
 const MAX_TEMPLATE_FILES = 5000;
+const systemAssetUrl = (path: string) => `${import.meta.env.BASE_URL}${path}`;
 const SYSTEM_IMAGE_ASSETS = [
   {
     id: 'system-editorial-burgundy-students',
-    url: '/generated/editorial-burgundy-students.png',
+    url: systemAssetUrl('generated/editorial-burgundy-students.png'),
     filename: 'editorial-burgundy-students.png',
     widthPx: 1448,
     heightPx: 1086,
   },
   {
     id: 'system-editorial-burgundy-teachers',
-    url: '/generated/editorial-burgundy-teachers.png',
+    url: systemAssetUrl('generated/editorial-burgundy-teachers.png'),
     filename: 'editorial-burgundy-teachers.png',
     widthPx: 1536,
     heightPx: 1024,
