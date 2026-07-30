@@ -86,6 +86,7 @@ interface CanvasControllerOptions {
 type FabricTransformCanvas = Canvas & {
   _currentTransform?: unknown;
   endCurrentTransform: (event: Event) => void;
+  _transformObject: (event: Event) => void;
 };
 
 const MIN_ZOOM = 0.2;
@@ -105,6 +106,7 @@ export class CanvasController {
   private tool: CanvasTool = 'select';
   private spacePressed = false;
   private draggingViewport = false;
+  private pointerPressed = false;
   private lastPointer = new Point(0, 0);
   private snappingEnabled = true;
   private gridVisible = true;
@@ -131,14 +133,15 @@ export class CanvasController {
       enableRetinaScaling: true,
       controlsAboveOverlay: true,
     });
+    this.guardFabricTransforms();
 
     this.buildScene();
     this.bindCanvasEvents();
     window.addEventListener('keydown', this.handleKeyDown);
     window.addEventListener('keyup', this.handleKeyUp);
-    window.addEventListener('mousedown', this.releaseStaleTransformBeforePointerDown, true);
-    window.addEventListener('pointerdown', this.releaseStaleTransformBeforePointerDown, true);
-    window.addEventListener('touchstart', this.releaseStaleTransformBeforePointerDown, true);
+    window.addEventListener('mousedown', this.handlePointerDown, true);
+    window.addEventListener('pointerdown', this.handlePointerDown, true);
+    window.addEventListener('touchstart', this.handlePointerDown, true);
     window.addEventListener('mouseup', this.releasePointerInteraction, true);
     window.addEventListener('pointerup', this.releasePointerInteraction, true);
     window.addEventListener('pointercancel', this.releasePointerInteraction, true);
@@ -180,13 +183,6 @@ export class CanvasController {
     if (tool === 'pan') this.canvas.discardActiveObject();
     this.canvas.requestRenderAll();
     this.emitState();
-  }
-
-  confirmSelection(): void {
-    this.releasePointerInteraction(new Event('confirmselection'));
-    this.canvas.discardActiveObject();
-    this.canvas.requestRenderAll();
-    this.emitState([]);
   }
 
   setGridVisible(visible: boolean): void {
@@ -628,9 +624,9 @@ export class CanvasController {
   async dispose(): Promise<void> {
     window.removeEventListener('keydown', this.handleKeyDown);
     window.removeEventListener('keyup', this.handleKeyUp);
-    window.removeEventListener('mousedown', this.releaseStaleTransformBeforePointerDown, true);
-    window.removeEventListener('pointerdown', this.releaseStaleTransformBeforePointerDown, true);
-    window.removeEventListener('touchstart', this.releaseStaleTransformBeforePointerDown, true);
+    window.removeEventListener('mousedown', this.handlePointerDown, true);
+    window.removeEventListener('pointerdown', this.handlePointerDown, true);
+    window.removeEventListener('touchstart', this.handlePointerDown, true);
     window.removeEventListener('mouseup', this.releasePointerInteraction, true);
     window.removeEventListener('pointerup', this.releasePointerInteraction, true);
     window.removeEventListener('pointercancel', this.releasePointerInteraction, true);
@@ -847,6 +843,7 @@ export class CanvasController {
   }
 
   private releasePointerInteraction = (event: Event): void => {
+    this.pointerPressed = false;
     this.releaseViewportDrag();
     const canvas = this.canvas as FabricTransformCanvas;
     if (!canvas._currentTransform) return;
@@ -855,16 +852,28 @@ export class CanvasController {
     this.emitState();
   };
 
-  private releaseStaleTransformBeforePointerDown = (event: Event): void => {
+  private handlePointerDown = (event: Event): void => {
     const canvas = this.canvas as FabricTransformCanvas;
-    if (!canvas._currentTransform) return;
-    this.releasePointerInteraction(event);
+    if (canvas._currentTransform) this.releasePointerInteraction(event);
+    this.pointerPressed = true;
   };
 
   private handleReleasedPointerMove = (event: MouseEvent | PointerEvent): void => {
-    if (event.buttons !== 0) return;
+    if (this.pointerPressed && event.buttons !== 0) return;
     this.releasePointerInteraction(event);
   };
+
+  private guardFabricTransforms(): void {
+    const canvas = this.canvas as FabricTransformCanvas;
+    const transformObject = canvas._transformObject.bind(canvas);
+    canvas._transformObject = (event: Event) => {
+      if (!this.pointerPressed || this.isPointerReleased(event)) {
+        this.releasePointerInteraction(event);
+        return;
+      }
+      transformObject(event);
+    };
+  }
 
   private handleVisibilityChange = (): void => {
     if (document.visibilityState === 'hidden') {

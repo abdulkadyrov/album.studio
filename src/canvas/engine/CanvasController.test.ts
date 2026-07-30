@@ -10,6 +10,7 @@ import { CanvasController } from './CanvasController';
 type TestFabricCanvas = {
   _currentTransform?: unknown;
   endCurrentTransform: (event: Event) => void;
+  _transformObject: (event: Event) => void;
   fire: (eventName: string, payload: unknown) => void;
   getObjects: () => Array<{ vakhaId?: string }>;
 };
@@ -42,6 +43,22 @@ describe('CanvasController', () => {
     fabricCanvas.endCurrentTransform = endCurrentTransform;
 
     window.dispatchEvent(new MouseEvent('mousemove', { buttons: 0 }));
+
+    expect(endCurrentTransform).toHaveBeenCalledOnce();
+    expect(fabricCanvas._currentTransform).toBeUndefined();
+    await controller.dispose();
+    element.remove();
+  });
+
+  it('не передвигает объект внутри Fabric без физически зажатой кнопки', async () => {
+    const { controller, element, fabricCanvas } = createController();
+    const endCurrentTransform = vi.fn(() => {
+      fabricCanvas._currentTransform = undefined;
+    });
+    fabricCanvas._currentTransform = { action: 'drag' };
+    fabricCanvas.endCurrentTransform = endCurrentTransform;
+
+    fabricCanvas._transformObject(new MouseEvent('mousemove', { buttons: 0 }));
 
     expect(endCurrentTransform).toHaveBeenCalledOnce();
     expect(fabricCanvas._currentTransform).toBeUndefined();
@@ -113,27 +130,6 @@ describe('CanvasController', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key, cancelable: true }));
 
     expect(endCurrentTransform).toHaveBeenCalledOnce();
-    expect(fabricCanvas._currentTransform).toBeUndefined();
-    await controller.dispose();
-    element.remove();
-  });
-
-  it('завершает трансформацию и снимает выделение по кнопке «Готово»', async () => {
-    const { controller, element, fabricCanvas } = createController();
-    const endCurrentTransform = vi.fn(() => {
-      fabricCanvas._currentTransform = undefined;
-    });
-    const discardActiveObject = vi.spyOn(
-      fabricCanvas as TestFabricCanvas & { discardActiveObject: () => void },
-      'discardActiveObject',
-    );
-    fabricCanvas._currentTransform = { action: 'drag' };
-    fabricCanvas.endCurrentTransform = endCurrentTransform;
-
-    controller.confirmSelection();
-
-    expect(endCurrentTransform).toHaveBeenCalledOnce();
-    expect(discardActiveObject).toHaveBeenCalledOnce();
     expect(fabricCanvas._currentTransform).toBeUndefined();
     await controller.dispose();
     element.remove();
