@@ -66,6 +66,58 @@ describe('CanvasController', () => {
     element.remove();
   });
 
+  it.each(['touchend', 'touchcancel', 'pointercancel'])(
+    'завершает трансформацию по событию %s',
+    async (eventType) => {
+      const { controller, element, fabricCanvas } = createController();
+      const endCurrentTransform = vi.fn(() => {
+        fabricCanvas._currentTransform = undefined;
+      });
+      fabricCanvas._currentTransform = { action: 'drag' };
+      fabricCanvas.endCurrentTransform = endCurrentTransform;
+
+      window.dispatchEvent(new Event(eventType));
+
+      expect(endCurrentTransform).toHaveBeenCalledOnce();
+      expect(endCurrentTransform.mock.calls[0]?.[0].type).toBe(eventType);
+      expect(fabricCanvas._currentTransform).toBeUndefined();
+      await controller.dispose();
+      element.remove();
+    },
+  );
+
+  it('сбрасывает старую трансформацию перед следующим нажатием', async () => {
+    const { controller, element, fabricCanvas } = createController();
+    const endCurrentTransform = vi.fn(() => {
+      fabricCanvas._currentTransform = undefined;
+    });
+    fabricCanvas._currentTransform = { action: 'drag' };
+    fabricCanvas.endCurrentTransform = endCurrentTransform;
+
+    window.dispatchEvent(new MouseEvent('mousedown', { buttons: 1 }));
+
+    expect(endCurrentTransform).toHaveBeenCalledOnce();
+    expect(fabricCanvas._currentTransform).toBeUndefined();
+    await controller.dispose();
+    element.remove();
+  });
+
+  it.each(['Enter', 'Escape'])('подтверждает перемещение клавишей %s', async (key) => {
+    const { controller, element, fabricCanvas } = createController();
+    const endCurrentTransform = vi.fn(() => {
+      fabricCanvas._currentTransform = undefined;
+    });
+    fabricCanvas._currentTransform = { action: 'drag' };
+    fabricCanvas.endCurrentTransform = endCurrentTransform;
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key, cancelable: true }));
+
+    expect(endCurrentTransform).toHaveBeenCalledOnce();
+    expect(fabricCanvas._currentTransform).toBeUndefined();
+    await controller.dispose();
+    element.remove();
+  });
+
   it('запрашивает выбор фото по двойному клику на фоторамке', async () => {
     const documentModel = createDefaultCanvasDocument('frame-dblclick-test');
     const pageId = documentModel.pages[0]!.id;

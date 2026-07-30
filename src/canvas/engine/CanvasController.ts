@@ -136,11 +136,19 @@ export class CanvasController {
     this.bindCanvasEvents();
     window.addEventListener('keydown', this.handleKeyDown);
     window.addEventListener('keyup', this.handleKeyUp);
+    window.addEventListener('mousedown', this.releaseStaleTransformBeforePointerDown, true);
+    window.addEventListener('pointerdown', this.releaseStaleTransformBeforePointerDown, true);
+    window.addEventListener('touchstart', this.releaseStaleTransformBeforePointerDown, true);
     window.addEventListener('mouseup', this.releasePointerInteraction, true);
     window.addEventListener('pointerup', this.releasePointerInteraction, true);
+    window.addEventListener('pointercancel', this.releasePointerInteraction, true);
+    window.addEventListener('touchend', this.releasePointerInteraction, true);
+    window.addEventListener('touchcancel', this.releasePointerInteraction, true);
     window.addEventListener('mousemove', this.handleReleasedPointerMove, true);
     window.addEventListener('pointermove', this.handleReleasedPointerMove, true);
     window.addEventListener('blur', this.releasePointerInteraction);
+    window.addEventListener('pagehide', this.releasePointerInteraction);
+    document.addEventListener('visibilitychange', this.handleVisibilityChange);
     this.emitState();
   }
 
@@ -613,11 +621,19 @@ export class CanvasController {
   async dispose(): Promise<void> {
     window.removeEventListener('keydown', this.handleKeyDown);
     window.removeEventListener('keyup', this.handleKeyUp);
+    window.removeEventListener('mousedown', this.releaseStaleTransformBeforePointerDown, true);
+    window.removeEventListener('pointerdown', this.releaseStaleTransformBeforePointerDown, true);
+    window.removeEventListener('touchstart', this.releaseStaleTransformBeforePointerDown, true);
     window.removeEventListener('mouseup', this.releasePointerInteraction, true);
     window.removeEventListener('pointerup', this.releasePointerInteraction, true);
+    window.removeEventListener('pointercancel', this.releasePointerInteraction, true);
+    window.removeEventListener('touchend', this.releasePointerInteraction, true);
+    window.removeEventListener('touchcancel', this.releasePointerInteraction, true);
     window.removeEventListener('mousemove', this.handleReleasedPointerMove, true);
     window.removeEventListener('pointermove', this.handleReleasedPointerMove, true);
     window.removeEventListener('blur', this.releasePointerInteraction);
+    window.removeEventListener('pagehide', this.releasePointerInteraction);
+    document.removeEventListener('visibilitychange', this.handleVisibilityChange);
     await this.canvas.dispose();
   }
 
@@ -832,9 +848,21 @@ export class CanvasController {
     this.emitState();
   };
 
+  private releaseStaleTransformBeforePointerDown = (event: Event): void => {
+    const canvas = this.canvas as FabricTransformCanvas;
+    if (!canvas._currentTransform) return;
+    this.releasePointerInteraction(event);
+  };
+
   private handleReleasedPointerMove = (event: MouseEvent | PointerEvent): void => {
     if (event.buttons !== 0) return;
     this.releasePointerInteraction(event);
+  };
+
+  private handleVisibilityChange = (): void => {
+    if (document.visibilityState === 'hidden') {
+      this.releasePointerInteraction(new Event('visibilitychange'));
+    }
   };
 
   private setZoom(value: number): void {
@@ -1094,8 +1122,20 @@ export class CanvasController {
   }
 
   private handleKeyDown = (event: KeyboardEvent): void => {
-    const target = event.target as HTMLElement | null;
-    if (target?.matches('input, textarea, [contenteditable="true"]')) return;
+    const target = event.target;
+    if (
+      target instanceof HTMLElement &&
+      target.matches('input, textarea, [contenteditable="true"]')
+    )
+      return;
+    if (event.key === 'Enter' || event.key === 'Escape') {
+      const canvas = this.canvas as FabricTransformCanvas;
+      if (canvas._currentTransform) {
+        event.preventDefault();
+        this.releasePointerInteraction(event);
+        return;
+      }
+    }
     if (event.code === 'Space') {
       this.spacePressed = true;
       this.setContentInteraction(false);
