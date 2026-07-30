@@ -142,11 +142,11 @@ export class CanvasController {
     window.addEventListener('mousedown', this.handlePointerDown, true);
     window.addEventListener('pointerdown', this.handlePointerDown, true);
     window.addEventListener('touchstart', this.handlePointerDown, true);
-    window.addEventListener('mouseup', this.releasePointerInteraction, true);
-    window.addEventListener('pointerup', this.releasePointerInteraction, true);
-    window.addEventListener('pointercancel', this.releasePointerInteraction, true);
-    window.addEventListener('touchend', this.releasePointerInteraction, true);
-    window.addEventListener('touchcancel', this.releasePointerInteraction, true);
+    window.addEventListener('mouseup', this.handlePointerUp, true);
+    window.addEventListener('pointerup', this.handlePointerUp, true);
+    window.addEventListener('pointercancel', this.handlePointerUp, true);
+    window.addEventListener('touchend', this.handlePointerUp, true);
+    window.addEventListener('touchcancel', this.handlePointerUp, true);
     window.addEventListener('mousemove', this.handleReleasedPointerMove, true);
     window.addEventListener('pointermove', this.handleReleasedPointerMove, true);
     window.addEventListener('blur', this.releasePointerInteraction);
@@ -627,11 +627,11 @@ export class CanvasController {
     window.removeEventListener('mousedown', this.handlePointerDown, true);
     window.removeEventListener('pointerdown', this.handlePointerDown, true);
     window.removeEventListener('touchstart', this.handlePointerDown, true);
-    window.removeEventListener('mouseup', this.releasePointerInteraction, true);
-    window.removeEventListener('pointerup', this.releasePointerInteraction, true);
-    window.removeEventListener('pointercancel', this.releasePointerInteraction, true);
-    window.removeEventListener('touchend', this.releasePointerInteraction, true);
-    window.removeEventListener('touchcancel', this.releasePointerInteraction, true);
+    window.removeEventListener('mouseup', this.handlePointerUp, true);
+    window.removeEventListener('pointerup', this.handlePointerUp, true);
+    window.removeEventListener('pointercancel', this.handlePointerUp, true);
+    window.removeEventListener('touchend', this.handlePointerUp, true);
+    window.removeEventListener('touchcancel', this.handlePointerUp, true);
     window.removeEventListener('mousemove', this.handleReleasedPointerMove, true);
     window.removeEventListener('pointermove', this.handleReleasedPointerMove, true);
     window.removeEventListener('blur', this.releasePointerInteraction);
@@ -846,8 +846,12 @@ export class CanvasController {
     this.pointerPressed = false;
     this.releaseViewportDrag();
     const canvas = this.canvas as FabricTransformCanvas;
-    if (!canvas._currentTransform) return;
+    if (!canvas._currentTransform) {
+      canvas.setCursor(canvas.defaultCursor);
+      return;
+    }
     canvas.endCurrentTransform(event);
+    canvas.setCursor(canvas.defaultCursor);
     this.canvas.requestRenderAll();
     this.emitState();
   };
@@ -860,7 +864,18 @@ export class CanvasController {
 
   private handleReleasedPointerMove = (event: MouseEvent | PointerEvent): void => {
     if (this.pointerPressed && event.buttons !== 0) return;
+    if (!(this.canvas as FabricTransformCanvas)._currentTransform) return;
     this.releasePointerInteraction(event);
+  };
+
+  private handlePointerUp = (event: Event): void => {
+    this.pointerPressed = false;
+    this.releaseViewportDrag();
+    queueMicrotask(() => {
+      const canvas = this.canvas as FabricTransformCanvas;
+      if (canvas._currentTransform) this.releasePointerInteraction(event);
+      else canvas.setCursor(canvas.defaultCursor);
+    });
   };
 
   private guardFabricTransforms(): void {

@@ -94,6 +94,7 @@ describe('CanvasController', () => {
       fabricCanvas.endCurrentTransform = endCurrentTransform;
 
       window.dispatchEvent(new Event(eventType));
+      await Promise.resolve();
 
       expect(endCurrentTransform).toHaveBeenCalledOnce();
       expect(endCurrentTransform.mock.calls[0]?.[0].type).toBe(eventType);
