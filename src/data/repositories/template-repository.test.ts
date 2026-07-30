@@ -33,6 +33,30 @@ describe('template repository', () => {
     expect(source?.document.layers.length).toBeGreaterThan(80);
   });
 
+  it('регистрирует полный бордовый альбом с заменяемыми портретами', async () => {
+    const source = await templateRepository.get('system-editorial-burgundy-2026');
+
+    expect(source?.template.name).toBe('Выпускной 2026 · бордовая редакция');
+    expect(source?.document.pages).toHaveLength(14);
+    expect(source?.document.pages.filter((page) => page.spreadId)).toHaveLength(12);
+    expect(source?.document.pages[0]?.pageType).toBe('cover');
+    expect(source?.document.pages.at(-1)?.pageType).toBe('closing');
+    expect(
+      source?.document.layers.filter((layer) => layer.name.includes('заменяемое фото')).length,
+    ).toBeGreaterThan(30);
+    expect(
+      source?.document.layers.some(
+        (layer) =>
+          layer.binding?.source === 'participant' && layer.binding.field === 'photoAssetId',
+      ),
+    ).toBe(true);
+    expect(
+      source?.document.layers.some(
+        (layer) => layer.binding?.source === 'teacher' && layer.binding.field === 'photoAssetId',
+      ),
+    ).toBe(true);
+  });
+
   it('регистрирует мраморный шаблон Санкт-Петербурга из генератора', async () => {
     const source = await templateRepository.get('system-spb-marble-2025');
 

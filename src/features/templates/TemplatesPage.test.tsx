@@ -14,6 +14,7 @@ describe('TemplatesPage', () => {
     );
 
     expect(await screen.findByText('Редакционный красный')).toBeInTheDocument();
+    expect(screen.getByText('Выпускной 2026 · бордовая редакция')).toBeInTheDocument();
     expect(screen.getByText('Выпускной 2026 · микс референсов')).toBeInTheDocument();
     expect(screen.getByText('Санкт-Петербург · мрамор')).toBeInTheDocument();
     expect(screen.getByText('Школьная доска')).toBeInTheDocument();

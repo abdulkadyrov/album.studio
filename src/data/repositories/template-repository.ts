@@ -19,6 +19,22 @@ import { canvasSceneRepository } from './canvas-scene-repository';
 
 const MAX_TEMPLATE_BYTES = 500 * 1024 * 1024;
 const MAX_TEMPLATE_FILES = 5000;
+const SYSTEM_IMAGE_ASSETS = [
+  {
+    id: 'system-editorial-burgundy-students',
+    url: '/generated/editorial-burgundy-students.png',
+    filename: 'editorial-burgundy-students.png',
+    widthPx: 1448,
+    heightPx: 1086,
+  },
+  {
+    id: 'system-editorial-burgundy-teachers',
+    url: '/generated/editorial-burgundy-teachers.png',
+    filename: 'editorial-burgundy-teachers.png',
+    widthPx: 1536,
+    heightPx: 1024,
+  },
+] as const;
 
 export interface SaveTemplateInput {
   name: string;
@@ -177,9 +193,49 @@ function remapDocument(document: CanvasDocument, projectId: string): CanvasDocum
 }
 
 async function ensureSystemTemplates(): Promise<void> {
-  const existingIds = new Set(await database.templates.toCollection().primaryKeys());
-  const missing = systemTemplates.filter((manifest) => !existingIds.has(manifest.template.id));
-  if (missing.length > 0) await database.templates.bulkPut(missing.map(toRecord));
+  const existingRecords = await database.templates.bulkGet(
+    systemTemplates.map((manifest) => manifest.template.id),
+  );
+  const favorites = new Map(
+    existingRecords.flatMap((record) => (record ? [[record.id, record.favorite] as const] : [])),
+  );
+  await database.templates.bulkPut(
+    systemTemplates.map((manifest) => ({
+      ...toRecord(manifest),
+      favorite: favorites.get(manifest.template.id) ?? 0,
+    })),
+  );
+
+  const existingAssetIds = new Set(
+    await database.assets
+      .bulkGet(SYSTEM_IMAGE_ASSETS.map((item) => item.id))
+      .then((records) => records.flatMap((record) => (record ? [record.id] : []))),
+  );
+  const missingAssets = SYSTEM_IMAGE_ASSETS.filter((item) => !existingAssetIds.has(item.id));
+  if (missingAssets.length === 0) return;
+  try {
+    const records = await Promise.all(
+      missingAssets.map(async (item): Promise<AssetRecord> => {
+        const response = await fetch(item.url);
+        if (!response.ok) throw new Error(`Не удалось загрузить ${item.filename}`);
+        const blob = await response.blob();
+        return {
+          id: item.id,
+          ownerType: 'system',
+          kind: 'image',
+          filename: item.filename,
+          mimeType: 'image/png',
+          byteSize: blob.size,
+          blob,
+          metadata: { widthPx: item.widthPx, heightPx: item.heightPx },
+          createdAt: new Date().toISOString(),
+        };
+      }),
+    );
+    await database.assets.bulkPut(records);
+  } catch {
+    // В unit-тестах нет HTTP-сервера; шаблон остаётся доступным с кликабельными плейсхолдерами.
+  }
 }
 
 export const templateRepository = {

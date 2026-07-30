@@ -1766,8 +1766,822 @@ function createSpbMarbleTemplate(): TemplateManifest {
   };
 }
 
+const editorialBurgundyStudentAssetId = 'system-editorial-burgundy-students';
+const editorialBurgundyTeacherAssetId = 'system-editorial-burgundy-teachers';
+
+function demoPortraitFrame(
+  templateId: string,
+  pageId: string,
+  index: number,
+  xMm: number,
+  yMm: number,
+  widthMm: number,
+  heightMm: number,
+  type: 'student' | 'teacher',
+  portraitIndex: number,
+): CanvasLayerSnapshot {
+  const layer = photoFrame(templateId, pageId, index, xMm, yMm, widthMm, heightMm, '#b8b8b8');
+  const columns = 4;
+  const rows = type === 'student' ? 3 : 2;
+  const column = portraitIndex % columns;
+  const row = Math.floor(portraitIndex / columns) % rows;
+  layer.name = `${type === 'student' ? 'Ученик' : 'Учитель'} · заменяемое фото ${
+    portraitIndex + 1
+  }`;
+  layer.image = {
+    ...createDefaultImageStyle({
+      assetId:
+        type === 'student' ? editorialBurgundyStudentAssetId : editorialBurgundyTeacherAssetId,
+      filename:
+        type === 'student' ? 'Демонстрационные выпускники.png' : 'Демонстрационные учителя.png',
+      mimeType: 'image/png',
+      naturalWidthPx: type === 'student' ? 1448 : 1536,
+      naturalHeightPx: type === 'student' ? 1086 : 1024,
+    }),
+    cropX: columns === 1 ? 0.5 : column / (columns - 1),
+    cropY: rows === 1 ? 0.5 : row / (rows - 1),
+    zoom: type === 'student' ? 3.1 : 2,
+  };
+  return layer;
+}
+
+function createEditorialBurgundyTemplate(): TemplateManifest {
+  const id = 'system-editorial-burgundy-2026';
+  const spread = (name: string) => `${id}:spread-${name}`;
+  const pages = [
+    makePage(id, 0, 'Передняя обложка', 'cover'),
+    makePage(id, 1, 'Титульная страница', 'universal', 'none', spread('intro'), 'left'),
+    makePage(id, 2, 'Наш класс · 1', 'class', 'none', spread('intro'), 'right'),
+    makePage(id, 3, 'Наш класс · 2', 'class', 'none', spread('class'), 'left'),
+    makePage(id, 4, 'Большой портрет класса', 'class', 'none', spread('class'), 'right'),
+    makePage(id, 5, 'Портрет выпускника', 'portrait', 'student', spread('student'), 'left'),
+    makePage(id, 6, 'Имя и пожелание', 'portrait', 'student', spread('student'), 'right'),
+    makePage(id, 7, 'Наши учителя', 'teachers', 'none', spread('teachers'), 'left'),
+    makePage(id, 8, 'Классный руководитель', 'teachers', 'teacher', spread('teachers'), 'right'),
+    makePage(id, 9, 'Школьные моменты · 1', 'events', 'none', spread('moments'), 'left'),
+    makePage(id, 10, 'Школьные моменты · 2', 'events', 'none', spread('moments'), 'right'),
+    makePage(id, 11, 'Пожелания · 1', 'universal', 'none', spread('wishes'), 'left'),
+    makePage(id, 12, 'Пожелания · 2', 'universal', 'none', spread('wishes'), 'right'),
+    makePage(id, 13, 'Задняя обложка', 'closing'),
+  ];
+  const [
+    cover,
+    titlePage,
+    classOne,
+    classTwo,
+    classHero,
+    studentPortrait,
+    studentName,
+    teachersGrid,
+    teacherHero,
+    momentsLeft,
+    momentsRight,
+    wishesLeft,
+    wishesRight,
+    backCover,
+  ] = pages;
+  const paper = '#f4f3ef';
+  const white = '#ffffff';
+  const burgundy = '#9d2932';
+  const burgundyDark = '#7f1f27';
+  const ink = '#17191d';
+  const muted = '#6c6c6a';
+  const names = [
+    'Алексей Смирнов',
+    'Анна Волкова',
+    'Максим Орлов',
+    'София Морозова',
+    'Мария Соколова',
+    'Даниил Кузнецов',
+    'Елизавета Попова',
+    'Артём Лебедев',
+    'Илья Козлов',
+    'Полина Новикова',
+    'Роман Павлов',
+    'Дарья Семёнова',
+  ];
+  const teacherNames = [
+    'А.В. Петров',
+    'Е.С. Иванова',
+    'М.Н. Орлов',
+    'Т.А. Волкова',
+    'Д.С. Лебедев',
+    'О.П. Соколова',
+    'В.И. Морозов',
+    'Н.А. Кузнецова',
+  ];
+  const pinstripe = (page: CanvasPageSnapshot, prefix: string, xMm: number, yMm: number) =>
+    Array.from({ length: 13 }, (_, index) =>
+      decorativeLayer(
+        id,
+        page.id,
+        `${prefix}-${index}`,
+        'Тонкая штриховка',
+        'rect',
+        2,
+        xMm,
+        yMm + index * 1.6,
+        38,
+        0.35,
+        index % 3 === 0 ? burgundy : '#9b9b99',
+        0.64,
+      ),
+    );
+  const pageMark = (page: CanvasPageSnapshot, value: string, right = false) => [
+    decorativeLayer(
+      id,
+      page.id,
+      'page-mark-line',
+      'Номер страницы · линия',
+      'rect',
+      40,
+      right ? 164 : 22,
+      260,
+      14,
+      0.8,
+      ink,
+    ),
+    tunedTextLayer(id, page.id, 98, value, right ? 178 : 8, 254, 14, 9, burgundy, 'center', {
+      fontWeight: '700',
+    }),
+  ];
+  const rosterPage = (page: CanvasPageSnapshot, startIndex: number, right = false) => [
+    background(id, page.id, paper),
+    decorativeLayer(
+      id,
+      page.id,
+      'roster-accent',
+      'Бордовая полоса',
+      'rect',
+      2,
+      right ? 184 : 0,
+      0,
+      16,
+      280,
+      burgundy,
+    ),
+    ...pinstripe(page, 'roster-stripe', right ? 140 : 22, 18),
+    tunedTextLayer(id, page.id, 0, 'ВЫПУСК', right ? 22 : 38, 18, 68, 11, burgundy, 'left', {
+      letterSpacingEm: 0.16,
+      fontWeight: '600',
+    }),
+    tunedTextLayer(id, page.id, 1, '2026', right ? 94 : 110, 13, 48, 22, ink, 'left', {
+      fontFamily: 'Georgia',
+    }),
+    ...Array.from({ length: 12 }, (_, index) => {
+      const column = index % 4;
+      const row = Math.floor(index / 4);
+      return demoPortraitFrame(
+        id,
+        page.id,
+        index,
+        (right ? 20 : 24) + column * 40,
+        50 + row * 66,
+        32,
+        45,
+        'student',
+        (startIndex + index) % 12,
+      );
+    }),
+    ...Array.from({ length: 12 }, (_, index) => {
+      const column = index % 4;
+      const row = Math.floor(index / 4);
+      return tunedTextLayer(
+        id,
+        page.id,
+        20 + index,
+        names[(startIndex + index) % names.length]!,
+        (right ? 18 : 22) + column * 40,
+        96 + row * 66,
+        36,
+        7,
+        ink,
+        'center',
+        { lineHeight: 1.02 },
+      );
+    }),
+    ...pageMark(page, right ? '03' : '02', right),
+  ];
+  const layers: CanvasLayerSnapshot[] = [
+    background(id, cover.id, paper),
+    decorativeLayer(
+      id,
+      cover.id,
+      'cover-spine',
+      'Бордовый корешок',
+      'rect',
+      2,
+      0,
+      0,
+      28,
+      280,
+      burgundy,
+    ),
+    decorativeLayer(
+      id,
+      cover.id,
+      'cover-field',
+      'Серая плоскость',
+      'rect',
+      2,
+      28,
+      0,
+      172,
+      280,
+      '#dddddc',
+    ),
+    decorativeLayer(
+      id,
+      cover.id,
+      'cover-white-panel',
+      'Белая карточка',
+      'rect',
+      3,
+      42,
+      22,
+      138,
+      232,
+      white,
+      0.96,
+      -2,
+      '#d2d2d0',
+      0.45,
+    ),
+    decorativeLayer(
+      id,
+      cover.id,
+      'cover-red-band',
+      'Горизонтальный акцент',
+      'rect',
+      4,
+      28,
+      94,
+      172,
+      28,
+      burgundy,
+    ),
+    ...pinstripe(cover, 'cover-stripe-top', 102, 18),
+    ...pinstripe(cover, 'cover-stripe-bottom', 94, 222),
+    decorativeLayer(id, cover.id, 'cover-year-box', 'Плашка года', 'rect', 5, 76, 34, 40, 52, ink),
+    tunedTextLayer(id, cover.id, 1, '20\n26', 78, 39, 36, 26, white, 'center', {
+      fontFamily: 'Georgia',
+      lineHeight: 0.94,
+    }),
+    tunedTextLayer(id, cover.id, 2, 'В', 38, 96, 66, 68, burgundy, 'center', {
+      fontFamily: 'serif',
+      fontStyle: 'italic',
+      fontWeight: 'normal',
+    }),
+    tunedTextLayer(id, cover.id, 3, 'выпускной', 88, 103, 88, 22, ink, 'left', {
+      fontWeight: '300',
+      letterSpacingEm: 0.08,
+    }),
+    tunedTextLayer(id, cover.id, 4, 'АЛЬБОМ', 92, 132, 78, 17, burgundy, 'left', {
+      fontFamily: 'Georgia',
+      letterSpacingEm: 0.12,
+    }),
+    tunedTextLayer(id, cover.id, 5, '11-Б\nКЛАСС', 92, 180, 52, 15, ink, 'left', {
+      lineHeight: 1.05,
+      fontWeight: '600',
+    }),
+    tunedTextLayer(id, cover.id, 6, 'С НАЗВАНИЕМ', 160, 46, 12, 9, ink, 'center', {
+      letterSpacingEm: 0.08,
+    }),
+
+    background(id, titlePage.id, paper),
+    decorativeLayer(
+      id,
+      titlePage.id,
+      'title-spine',
+      'Бордовая полоса',
+      'rect',
+      2,
+      0,
+      0,
+      18,
+      280,
+      burgundy,
+    ),
+    ...pinstripe(titlePage, 'title-lines', 28, 28),
+    tunedTextLayer(id, titlePage.id, 0, 'НАША\nИСТОРИЯ', 36, 62, 126, 40, ink, 'left', {
+      fontFamily: 'Georgia',
+      lineHeight: 0.98,
+    }),
+    tunedTextLayer(id, titlePage.id, 1, 'ШКОЛА №25', 38, 157, 94, 12, burgundy, 'left', {
+      letterSpacingEm: 0.16,
+      fontWeight: '600',
+    }),
+    tunedTextLayer(id, titlePage.id, 2, '11-Б КЛАСС · 2026', 38, 179, 112, 15, ink, 'left'),
+    tunedTextLayer(
+      id,
+      titlePage.id,
+      3,
+      'Один класс. Один выпуск.\nСотни историй, которые\nостанутся с нами.',
+      38,
+      208,
+      112,
+      11,
+      muted,
+      'left',
+      { fontStyle: 'italic', lineHeight: 1.3 },
+    ),
+    ...pageMark(titlePage, '01'),
+
+    ...rosterPage(classOne, 0, true),
+    ...rosterPage(classTwo, 6, false),
+
+    background(id, classHero.id, paper),
+    decorativeLayer(
+      id,
+      classHero.id,
+      'hero-band',
+      'Бордовый блок',
+      'rect',
+      2,
+      0,
+      206,
+      200,
+      74,
+      burgundy,
+    ),
+    demoPortraitFrame(id, classHero.id, 0, 18, 22, 136, 176, 'student', 0),
+    tunedTextLayer(id, classHero.id, 0, 'НАШ\nКЛАСС', 158, 30, 34, 34, ink, 'left', {
+      fontFamily: 'Georgia',
+      fontWeight: '700',
+      lineHeight: 0.92,
+    }),
+    tunedTextLayer(id, classHero.id, 1, '11-Б', 144, 218, 48, 30, white, 'center', {
+      fontFamily: 'Georgia',
+    }),
+    tunedTextLayer(id, classHero.id, 2, 'вместе с 2015 года', 58, 229, 80, 11, white, 'center', {
+      letterSpacingEm: 0.08,
+    }),
+
+    background(id, studentPortrait.id, '#dddddc'),
+    decorativeLayer(
+      id,
+      studentPortrait.id,
+      'student-white-card',
+      'Белое поле',
+      'rect',
+      2,
+      18,
+      18,
+      164,
+      244,
+      white,
+    ),
+    decorativeLayer(
+      id,
+      studentPortrait.id,
+      'student-red-corner',
+      'Бордовый угол',
+      'rect',
+      3,
+      18,
+      18,
+      22,
+      244,
+      burgundy,
+    ),
+    demoPortraitFrame(id, studentPortrait.id, 0, 48, 34, 116, 184, 'student', 2),
+    tunedTextLayer(id, studentPortrait.id, 0, 'ВЫПУСКНИК', 48, 228, 70, 10, burgundy, 'left', {
+      letterSpacingEm: 0.16,
+      fontWeight: '600',
+    }),
+    tunedTextLayer(id, studentPortrait.id, 1, '2026', 120, 222, 44, 24, ink, 'right', {
+      fontFamily: 'Georgia',
+    }),
+
+    background(id, studentName.id, paper),
+    decorativeLayer(
+      id,
+      studentName.id,
+      'name-band',
+      'Бордовая вертикаль',
+      'rect',
+      2,
+      172,
+      0,
+      28,
+      280,
+      burgundy,
+    ),
+    ...pinstripe(studentName, 'name-lines', 126, 28),
+    tunedTextLayer(id, studentName.id, 0, 'АЛЕКСЕЙ\nСМИРНОВ', 24, 54, 136, 38, ink, 'left', {
+      fontFamily: 'Georgia',
+      fontWeight: '700',
+      lineHeight: 1.02,
+    }),
+    tunedTextLayer(id, studentName.id, 1, '11-Б КЛАСС', 28, 143, 82, 12, burgundy, 'left', {
+      letterSpacingEm: 0.15,
+      fontWeight: '600',
+    }),
+    tunedTextLayer(
+      id,
+      studentName.id,
+      2,
+      '«Смело идти вперёд,\nне забывая тех,\nс кем всё начиналось»',
+      28,
+      181,
+      118,
+      15,
+      muted,
+      'left',
+      { fontFamily: 'serif', fontStyle: 'italic', lineHeight: 1.24 },
+    ),
+    demoPortraitFrame(id, studentName.id, 1, 126, 214, 34, 44, 'student', 2),
+
+    background(id, teachersGrid.id, paper),
+    decorativeLayer(
+      id,
+      teachersGrid.id,
+      'teachers-spine',
+      'Бордовая полоса',
+      'rect',
+      2,
+      0,
+      0,
+      18,
+      280,
+      burgundy,
+    ),
+    tunedTextLayer(id, teachersGrid.id, 0, 'НАШИ УЧИТЕЛЯ', 30, 20, 142, 22, ink, 'center', {
+      fontFamily: 'Georgia',
+      fontWeight: '700',
+    }),
+    tunedTextLayer(
+      id,
+      teachersGrid.id,
+      1,
+      'спасибо за знания и поддержку',
+      30,
+      45,
+      142,
+      9,
+      muted,
+      'center',
+    ),
+    ...Array.from({ length: 8 }, (_, index) => {
+      const column = index % 4;
+      const row = Math.floor(index / 4);
+      return demoPortraitFrame(
+        id,
+        teachersGrid.id,
+        index,
+        28 + column * 39,
+        70 + row * 88,
+        31,
+        54,
+        'teacher',
+        index,
+      );
+    }),
+    ...Array.from({ length: 8 }, (_, index) => {
+      const column = index % 4;
+      const row = Math.floor(index / 4);
+      return tunedTextLayer(
+        id,
+        teachersGrid.id,
+        20 + index,
+        teacherNames[index]!,
+        26 + column * 39,
+        126 + row * 88,
+        35,
+        7,
+        ink,
+        'center',
+      );
+    }),
+    ...pageMark(teachersGrid, '07'),
+
+    background(id, teacherHero.id, paper),
+    decorativeLayer(
+      id,
+      teacherHero.id,
+      'teacher-band',
+      'Бордовая плоскость',
+      'rect',
+      2,
+      0,
+      0,
+      54,
+      280,
+      burgundy,
+    ),
+    demoPortraitFrame(id, teacherHero.id, 0, 40, 30, 116, 174, 'teacher', 1),
+    tunedTextLayer(
+      id,
+      teacherHero.id,
+      0,
+      'ЕЛЕНА\nСЕРГЕЕВНА\nИВАНОВА',
+      78,
+      214,
+      102,
+      25,
+      ink,
+      'center',
+      {
+        fontFamily: 'Georgia',
+        fontWeight: '700',
+        lineHeight: 1.02,
+      },
+    ),
+    tunedTextLayer(
+      id,
+      teacherHero.id,
+      1,
+      'КЛАССНЫЙ РУКОВОДИТЕЛЬ',
+      64,
+      255,
+      128,
+      9,
+      burgundy,
+      'center',
+      {
+        letterSpacingEm: 0.12,
+        fontWeight: '600',
+      },
+    ),
+
+    background(id, momentsLeft.id, paper),
+    decorativeLayer(
+      id,
+      momentsLeft.id,
+      'moments-left-band',
+      'Бордовая полоса',
+      'rect',
+      2,
+      0,
+      0,
+      20,
+      280,
+      burgundy,
+    ),
+    tunedTextLayer(id, momentsLeft.id, 0, 'ШКОЛЬНЫЕ\nМОМЕНТЫ', 34, 24, 138, 27, ink, 'left', {
+      fontFamily: 'Georgia',
+      fontWeight: '700',
+      lineHeight: 1,
+    }),
+    demoPortraitFrame(id, momentsLeft.id, 0, 34, 92, 62, 86, 'student', 5),
+    demoPortraitFrame(id, momentsLeft.id, 1, 106, 82, 64, 52, 'student', 7),
+    demoPortraitFrame(id, momentsLeft.id, 2, 106, 144, 64, 78, 'student', 9),
+    tunedTextLayer(
+      id,
+      momentsLeft.id,
+      1,
+      'УРОКИ · ПЕРЕМЕНЫ · ПОБЕДЫ',
+      34,
+      236,
+      136,
+      9,
+      burgundy,
+      'center',
+      {
+        letterSpacingEm: 0.1,
+      },
+    ),
+
+    background(id, momentsRight.id, paper),
+    ...pinstripe(momentsRight, 'moments-right-lines', 142, 18),
+    demoPortraitFrame(id, momentsRight.id, 0, 22, 24, 112, 92, 'student', 10),
+    demoPortraitFrame(id, momentsRight.id, 1, 22, 128, 54, 74, 'student', 1),
+    demoPortraitFrame(id, momentsRight.id, 2, 86, 128, 92, 112, 'student', 11),
+    decorativeLayer(
+      id,
+      momentsRight.id,
+      'moments-red-block',
+      'Бордовая плашка',
+      'rect',
+      3,
+      0,
+      244,
+      200,
+      36,
+      burgundy,
+    ),
+    tunedTextLayer(id, momentsRight.id, 0, 'ЭТО БЫЛО С НАМИ', 34, 252, 132, 13, white, 'center', {
+      letterSpacingEm: 0.14,
+      fontWeight: '600',
+    }),
+
+    background(id, wishesLeft.id, burgundyDark),
+    tunedTextLayer(id, wishesLeft.id, 0, 'ПОЖЕЛАНИЯ', 24, 26, 152, 24, white, 'center', {
+      fontFamily: 'Georgia',
+      fontWeight: '700',
+      letterSpacingEm: 0.08,
+    }),
+    ...Array.from({ length: 4 }, (_, index) =>
+      decorativeLayer(
+        id,
+        wishesLeft.id,
+        `wish-card-${index}`,
+        'Карточка пожелания',
+        'rect',
+        3,
+        24 + (index % 2) * 80,
+        72 + Math.floor(index / 2) * 88,
+        68,
+        70,
+        white,
+        0.96,
+        index % 2 ? 1.5 : -1.5,
+      ),
+    ),
+    ...Array.from({ length: 4 }, (_, index) =>
+      tunedTextLayer(
+        id,
+        wishesLeft.id,
+        10 + index,
+        'Здесь будет\nтёплое пожелание\nот одноклассника',
+        31 + (index % 2) * 80,
+        91 + Math.floor(index / 2) * 88,
+        54,
+        9,
+        ink,
+        'center',
+        { fontStyle: 'italic', lineHeight: 1.25 },
+      ),
+    ),
+
+    background(id, wishesRight.id, paper),
+    decorativeLayer(
+      id,
+      wishesRight.id,
+      'wish-right-band',
+      'Бордовая полоса',
+      'rect',
+      2,
+      180,
+      0,
+      20,
+      280,
+      burgundy,
+    ),
+    tunedTextLayer(id, wishesRight.id, 0, 'ВПЕРЕДИ —\nЦЕЛАЯ ЖИЗНЬ', 26, 38, 138, 34, ink, 'left', {
+      fontFamily: 'Georgia',
+      fontWeight: '700',
+      lineHeight: 1.02,
+    }),
+    tunedTextLayer(
+      id,
+      wishesRight.id,
+      1,
+      'Пусть всё задуманное сбудется,\nа школьные годы останутся\nточкой опоры.',
+      28,
+      142,
+      126,
+      14,
+      muted,
+      'left',
+      { fontStyle: 'italic', lineHeight: 1.3 },
+    ),
+    tunedTextLayer(id, wishesRight.id, 2, '2026', 92, 214, 68, 38, burgundy, 'right', {
+      fontFamily: 'Georgia',
+    }),
+
+    background(id, backCover.id, '#dddddc'),
+    decorativeLayer(
+      id,
+      backCover.id,
+      'back-spine',
+      'Бордовый корешок',
+      'rect',
+      2,
+      172,
+      0,
+      28,
+      280,
+      burgundy,
+    ),
+    decorativeLayer(
+      id,
+      backCover.id,
+      'back-card',
+      'Белая карточка',
+      'rect',
+      3,
+      28,
+      34,
+      124,
+      210,
+      white,
+      0.96,
+      1.4,
+    ),
+    ...pinstripe(backCover, 'back-lines', 38, 52),
+    tunedTextLayer(id, backCover.id, 0, '11-Б', 54, 92, 74, 36, burgundy, 'center', {
+      fontFamily: 'Georgia',
+      fontWeight: '700',
+    }),
+    tunedTextLayer(id, backCover.id, 1, 'ШКОЛА №25', 46, 142, 90, 13, ink, 'center', {
+      letterSpacingEm: 0.14,
+    }),
+    tunedTextLayer(id, backCover.id, 2, 'МОСКВА · 2026', 46, 168, 90, 11, muted, 'center'),
+    tunedTextLayer(
+      id,
+      backCover.id,
+      3,
+      'НАША ИСТОРИЯ\nПРОДОЛЖАЕТСЯ',
+      44,
+      206,
+      94,
+      12,
+      burgundy,
+      'center',
+      {
+        fontWeight: '600',
+        letterSpacingEm: 0.1,
+      },
+    ),
+  ];
+
+  const studentPhotoIds = [
+    `${id}:${studentPortrait.id}:frame-0`,
+    `${id}:${studentName.id}:frame-1`,
+  ];
+  for (const layer of layers) {
+    if (studentPhotoIds.includes(layer.id)) {
+      layer.binding = {
+        source: 'participant',
+        field: 'photoAssetId',
+        fallback: editorialBurgundyStudentAssetId,
+      };
+    }
+    if (layer.id === `${id}:${studentName.id}:text-0`) {
+      layer.binding = {
+        source: 'participant',
+        field: 'fullName',
+        fallback: 'АЛЕКСЕЙ СМИРНОВ',
+      };
+    }
+    if (layer.id === `${id}:${teacherHero.id}:frame-0`) {
+      layer.binding = {
+        source: 'teacher',
+        field: 'photoAssetId',
+        fallback: editorialBurgundyTeacherAssetId,
+      };
+    }
+    if (layer.id === `${id}:${teacherHero.id}:text-0`) {
+      layer.binding = {
+        source: 'teacher',
+        field: 'fullName',
+        fallback: 'ЕЛЕНА СЕРГЕЕВНА ИВАНОВА',
+      };
+    }
+  }
+
+  const document: CanvasDocument = {
+    version: 2,
+    projectId: id,
+    pages,
+    layers,
+    updatedAt: createdAt,
+  };
+  return {
+    format: 'vakha-template',
+    version: 1,
+    template: {
+      id,
+      name: 'Выпускной 2026 · бордовая редакция',
+      description:
+        'Полный альбом по референсу: передняя и задняя обложки, 6 разворотов, сетки выпускников и учителей, персональные страницы, события и пожелания. Все фото заменяются кликом.',
+      category: 'grade-11',
+      style: 'classic',
+      color: 'red',
+      orientation: 'portrait',
+      source: 'system',
+      favorite: false,
+      createdAt,
+      updatedAt: createdAt,
+    },
+    document,
+    assets: [
+      {
+        id: editorialBurgundyStudentAssetId,
+        path: `assets/${editorialBurgundyStudentAssetId}`,
+        filename: 'editorial-burgundy-students.png',
+        mimeType: 'image/png',
+        kind: 'image',
+        byteSize: 1989153,
+        metadata: { widthPx: 1448, heightPx: 1086 },
+      },
+      {
+        id: editorialBurgundyTeacherAssetId,
+        path: `assets/${editorialBurgundyTeacherAssetId}`,
+        filename: 'editorial-burgundy-teachers.png',
+        mimeType: 'image/png',
+        kind: 'image',
+        byteSize: 2335326,
+        metadata: { widthPx: 1536, heightPx: 1024 },
+      },
+    ],
+  };
+}
+
 export const systemTemplates: TemplateManifest[] = [
   createSpbMarbleTemplate(),
+  createEditorialBurgundyTemplate(),
   createReferenceMixTemplate(),
   createSystemTemplate({
     id: 'system-editorial-red',
