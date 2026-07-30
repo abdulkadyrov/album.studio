@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  Check,
   Download,
   Frame,
   Grid3X3,
@@ -320,6 +321,15 @@ export function EditorShell() {
             active={snappingEnabled}
             onClick={() => setSnappingEnabled((value) => !value)}
           />
+          {canvasState.selectedIds.length > 0 ? (
+            <Button
+              variant="primary"
+              icon={<Check size={15} />}
+              onClick={() => canvasRef.current?.confirmSelection()}
+            >
+              Готово
+            </Button>
+          ) : null}
         </div>
         <div className="editor-topbar__actions">
           <Button

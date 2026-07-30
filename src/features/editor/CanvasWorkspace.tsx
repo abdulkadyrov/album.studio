@@ -65,6 +65,7 @@ export interface CanvasWorkspaceHandle {
   zoomIn: () => void;
   zoomOut: () => void;
   fit: () => void;
+  confirmSelection: () => void;
   reset: () => void;
   selectLayers: (layerIds: string[]) => void;
   renameLayer: (layerId: string, name: string) => void;
@@ -234,6 +235,7 @@ function CanvasWorkspaceComponent(
       zoomIn: () => controllerRef.current?.zoomIn(),
       zoomOut: () => controllerRef.current?.zoomOut(),
       fit: () => controllerRef.current?.fitToViewport(),
+      confirmSelection: () => controllerRef.current?.confirmSelection(),
       reset: () => controllerRef.current?.resetToDefault(),
       selectLayers: (ids) => controllerRef.current?.selectLayers(ids),
       renameLayer: (id, name) => controllerRef.current?.renameLayer(id, name),

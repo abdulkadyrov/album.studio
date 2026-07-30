@@ -118,6 +118,27 @@ describe('CanvasController', () => {
     element.remove();
   });
 
+  it('завершает трансформацию и снимает выделение по кнопке «Готово»', async () => {
+    const { controller, element, fabricCanvas } = createController();
+    const endCurrentTransform = vi.fn(() => {
+      fabricCanvas._currentTransform = undefined;
+    });
+    const discardActiveObject = vi.spyOn(
+      fabricCanvas as TestFabricCanvas & { discardActiveObject: () => void },
+      'discardActiveObject',
+    );
+    fabricCanvas._currentTransform = { action: 'drag' };
+    fabricCanvas.endCurrentTransform = endCurrentTransform;
+
+    controller.confirmSelection();
+
+    expect(endCurrentTransform).toHaveBeenCalledOnce();
+    expect(discardActiveObject).toHaveBeenCalledOnce();
+    expect(fabricCanvas._currentTransform).toBeUndefined();
+    await controller.dispose();
+    element.remove();
+  });
+
   it('запрашивает выбор фото по двойному клику на фоторамке', async () => {
     const documentModel = createDefaultCanvasDocument('frame-dblclick-test');
     const pageId = documentModel.pages[0]!.id;

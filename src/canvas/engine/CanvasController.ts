@@ -182,6 +182,13 @@ export class CanvasController {
     this.emitState();
   }
 
+  confirmSelection(): void {
+    this.releasePointerInteraction(new Event('confirmselection'));
+    this.canvas.discardActiveObject();
+    this.canvas.requestRenderAll();
+    this.emitState([]);
+  }
+
   setGridVisible(visible: boolean): void {
     this.gridVisible = visible;
     this.gridObjects.forEach((object) => object.set({ visible }));
