@@ -33,6 +33,41 @@ describe('template repository', () => {
     expect(source?.document.layers.length).toBeGreaterThan(80);
   });
 
+  it('регистрирует геометрический шаблон 4 класса как набор редактируемых слоёв', async () => {
+    const source = await templateRepository.get('system-grade4-geometry-2026');
+
+    expect(source?.template.name).toBe('4-А · геометрия');
+    expect(source?.template.source).toBe('codex');
+    expect(source?.document.pages).toHaveLength(6);
+    expect(source?.document.pages.filter((page) => page.spreadId)).toHaveLength(4);
+    expect(source?.document.pages.filter((page) => page.repeatFor === 'student')).toHaveLength(2);
+    expect(source?.document.layers.filter((layer) => layer.kind === 'frame')).toHaveLength(29);
+    expect(
+      source?.document.layers.filter((layer) => layer.kind === 'frame' && layer.binding),
+    ).toHaveLength(29);
+    expect(source?.document.layers.length).toBeGreaterThan(120);
+    expect(source?.assets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'system-grade4-neutral-placeholder-v2',
+          kind: 'svg',
+          mimeType: 'image/svg+xml',
+        }),
+      ]),
+    );
+    expect(
+      source?.document.layers.some(
+        (layer) =>
+          layer.binding?.source === 'participant' && layer.binding.field === 'photoAssetId',
+      ),
+    ).toBe(true);
+    expect(
+      source?.document.layers.some(
+        (layer) => layer.binding?.source === 'class' && layer.binding.field === 'schoolName',
+      ),
+    ).toBe(true);
+  });
+
   it('регистрирует полный бордовый альбом с заменяемыми портретами', async () => {
     const source = await templateRepository.get('system-editorial-burgundy-2026');
 

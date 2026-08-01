@@ -21,6 +21,7 @@ interface Palette {
 }
 
 const createdAt = '2026-01-01T00:00:00.000Z';
+const grade4NeutralPlaceholderAssetId = 'system-grade4-neutral-placeholder-v2';
 
 function makePage(
   templateId: string,
@@ -366,6 +367,737 @@ function tunedTextLayer(
     };
   }
   return layer;
+}
+
+function createGrade4GeometryTemplate(): TemplateManifest {
+  const id = 'system-grade4-geometry-2026';
+  const paper = '#f7f7f4';
+  const white = '#ffffff';
+  const ink = '#202124';
+  const muted = '#777b80';
+  const yellow = '#f2ad16';
+  const blue = '#6f9cc6';
+  const paleBlue = '#dce8f1';
+  const gray = '#c8cbce';
+  const spreadEvents = `${id}:spread-events`;
+  const spreadPortrait = `${id}:spread-portrait`;
+  const pages = [
+    makePage(id, 0, 'Обложка · 4 класс', 'cover'),
+    makePage(id, 1, 'Школьная жизнь · левая', 'events', 'none', spreadEvents, 'left'),
+    makePage(id, 2, 'Школьная жизнь · правая', 'events', 'none', spreadEvents, 'right'),
+    makePage(id, 3, 'Выпускник · портрет', 'portrait', 'student', spreadPortrait, 'left'),
+    makePage(id, 4, 'Выпускник · наш класс', 'portrait', 'student', spreadPortrait, 'right'),
+    makePage(id, 5, 'Задняя обложка', 'closing'),
+  ];
+  const [cover, eventsLeft, eventsRight, portraitLeft, portraitRight, backCover] = pages as [
+    CanvasPageSnapshot,
+    CanvasPageSnapshot,
+    CanvasPageSnapshot,
+    CanvasPageSnapshot,
+    CanvasPageSnapshot,
+    CanvasPageSnapshot,
+  ];
+
+  const shape = (
+    page: CanvasPageSnapshot,
+    key: string,
+    name: string,
+    kind: 'rect' | 'circle',
+    zIndex: number,
+    xMm: number,
+    yMm: number,
+    widthMm: number,
+    heightMm: number,
+    fill: string,
+    rotationDeg = 0,
+    opacity = 1,
+    stroke = 'transparent',
+    strokeWidthMm = 0,
+  ) =>
+    decorativeLayer(
+      id,
+      page.id,
+      key,
+      name,
+      kind,
+      zIndex,
+      xMm,
+      yMm,
+      widthMm,
+      heightMm,
+      fill,
+      opacity,
+      rotationDeg,
+      stroke,
+      strokeWidthMm,
+    );
+
+  const text = (
+    page: CanvasPageSnapshot,
+    index: number,
+    name: string,
+    content: string,
+    xMm: number,
+    yMm: number,
+    widthMm: number,
+    fontSizePt: number,
+    color = ink,
+    align: 'left' | 'center' | 'right' = 'left',
+    options: Parameters<typeof tunedTextLayer>[10] = {},
+  ) => {
+    const layer = tunedTextLayer(
+      id,
+      page.id,
+      index,
+      content,
+      xMm,
+      yMm,
+      widthMm,
+      fontSizePt,
+      color,
+      align,
+      { fontFamily: 'sans-serif', ...options },
+    );
+    layer.name = name;
+    return layer;
+  };
+
+  const photo = (
+    page: CanvasPageSnapshot,
+    index: number,
+    name: string,
+    xMm: number,
+    yMm: number,
+    widthMm: number,
+    heightMm: number,
+    options: { rotation?: number; rounded?: boolean; shadow?: boolean } = {},
+  ) => {
+    const layer = photoFrame(
+      id,
+      page.id,
+      index,
+      xMm,
+      yMm,
+      widthMm,
+      heightMm,
+      '#e8ebed',
+      options.rounded ? 'rounded' : 'rectangle',
+    );
+    layer.name = name;
+    layer.rotationDeg = options.rotation ?? 0;
+    layer.stroke = white;
+    layer.strokeWidthMm = 1.2;
+    layer.binding = {
+      source: 'project',
+      field: `commonPhotos.page${page.order + 1}.slot${index + 1}`,
+      fallback: grade4NeutralPlaceholderAssetId,
+    };
+    if (layer.image) {
+      layer.image.assetId = grade4NeutralPlaceholderAssetId;
+      layer.image.filename = 'grade4-neutral-placeholder.svg';
+      layer.image.mimeType = 'image/svg+xml';
+      layer.image.naturalWidthPx = 2400;
+      layer.image.naturalHeightPx = 3200;
+      layer.image.cornerRadiusMm = options.rounded ? 2.5 : 0;
+      layer.image.shadow = {
+        enabled: options.shadow ?? true,
+        color: '#202124',
+        opacity: 0.18,
+        blur: 7,
+        offsetXmm: 1.2,
+        offsetYmm: 1.8,
+      };
+    }
+    return layer;
+  };
+
+  const magnifier = (page: CanvasPageSnapshot, prefix: string, x: number, y: number) => [
+    shape(
+      page,
+      `${prefix}-ring`,
+      'Декор · кольцо лупы',
+      'circle',
+      4,
+      x,
+      y,
+      18,
+      18,
+      'transparent',
+      0,
+      1,
+      ink,
+      1.1,
+    ),
+    shape(
+      page,
+      `${prefix}-handle`,
+      'Декор · ручка лупы',
+      'rect',
+      4,
+      x + 15,
+      y + 17,
+      2.2,
+      12,
+      ink,
+      -42,
+    ),
+  ];
+
+  const triangle = (
+    page: CanvasPageSnapshot,
+    prefix: string,
+    x: number,
+    y: number,
+    size: number,
+    color: string,
+    zIndex = 3,
+  ) => [
+    shape(
+      page,
+      `${prefix}-a`,
+      'Декор · сторона треугольника',
+      'rect',
+      zIndex,
+      x,
+      y,
+      size,
+      1,
+      color,
+    ),
+    shape(
+      page,
+      `${prefix}-b`,
+      'Декор · сторона треугольника',
+      'rect',
+      zIndex,
+      x,
+      y,
+      size,
+      1,
+      color,
+      60,
+    ),
+    shape(
+      page,
+      `${prefix}-c`,
+      'Декор · сторона треугольника',
+      'rect',
+      zIndex,
+      x + size,
+      y,
+      size,
+      1,
+      color,
+      120,
+    ),
+  ];
+
+  const dottedArc = (
+    page: CanvasPageSnapshot,
+    prefix: string,
+    cx: number,
+    cy: number,
+    radius: number,
+    startDeg: number,
+    endDeg: number,
+    color: string,
+  ) =>
+    Array.from({ length: 12 }, (_, index) => {
+      const angle = (startDeg + ((endDeg - startDeg) * index) / 11) * (Math.PI / 180);
+      return shape(
+        page,
+        `${prefix}-${index + 1}`,
+        'Декор · пунктирная дуга',
+        'circle',
+        3,
+        cx + Math.cos(angle) * radius,
+        cy + Math.sin(angle) * radius,
+        1.1,
+        1.1,
+        color,
+        0,
+        0.8,
+      );
+    });
+
+  const inkDots = (page: CanvasPageSnapshot, prefix: string, x: number, y: number, count: number) =>
+    Array.from({ length: count }, (_, index) => {
+      const column = index % 5;
+      const row = Math.floor(index / 5);
+      const diameter = [1.2, 2.1, 1.5, 3.1, 1.1][index % 5]!;
+      return shape(
+        page,
+        `${prefix}-${index + 1}`,
+        'Декор · чернильная точка',
+        'circle',
+        5,
+        x + column * 5.2 + (row % 2) * 2.1,
+        y + row * 5.2,
+        diameter,
+        diameter,
+        ink,
+        0,
+        0.88,
+      );
+    });
+
+  const coverClass = text(cover, 0, 'Класс · цифра', '4', 26, 68, 100, 190, yellow, 'center', {
+    fontWeight: '700',
+    lineHeight: 0.8,
+  });
+  coverClass.binding = { source: 'class', field: 'gradeNumber', fallback: '4' };
+  const coverLetter = text(cover, 1, 'Класс · буква', 'а', 108, 77, 58, 105, ink, 'left', {
+    fontWeight: '300',
+  });
+  coverLetter.binding = { source: 'class', field: 'classLetter', fallback: 'а' };
+  const coverSchool = text(cover, 2, 'Название школы', 'ШКОЛА', 46, 226, 108, 10, ink, 'center', {
+    letterSpacingEm: 0.15,
+  });
+  coverSchool.binding = { source: 'class', field: 'schoolName', fallback: 'ШКОЛА' };
+  const coverYear = text(cover, 3, 'Год выпуска', '2026', 46, 242, 108, 9, muted, 'center', {
+    letterSpacingEm: 0.1,
+  });
+  coverYear.binding = { source: 'class', field: 'academicYear', fallback: '2026' };
+
+  const eventPhotoSpecs = [
+    [0, 'Общее фото класса', 18, 24, 164, 66, -1.2],
+    [1, 'Событие · фото 1', 18, 102, 74, 72, 0.8],
+    [2, 'Событие · фото 2', 102, 99, 80, 49, -0.8],
+    [3, 'Событие · фото 3', 100, 157, 82, 56, 1.2],
+    [4, 'Событие · фото 4', 18, 184, 74, 64, -1],
+  ] as const;
+  const leftEventPhotos = eventPhotoSpecs.map(([index, name, x, y, width, height, rotation]) =>
+    photo(eventsLeft, index, name, x, y, width, height, { rotation }),
+  );
+  const eventTitle = text(
+    eventsLeft,
+    0,
+    'Заголовок разворота',
+    'НАША ШКОЛЬНАЯ ИСТОРИЯ',
+    22,
+    257,
+    156,
+    12,
+    ink,
+    'center',
+    { fontWeight: '600', letterSpacingEm: 0.12 },
+  );
+
+  const rightEventPhotos = [
+    photo(eventsRight, 0, 'Событие · фото 5', 16, 23, 78, 61, { rotation: 1 }),
+    photo(eventsRight, 1, 'Событие · фото 6', 104, 24, 80, 86, { rotation: -0.8 }),
+    photo(eventsRight, 2, 'Событие · фото 7', 16, 95, 78, 92, { rotation: -1.2 }),
+    photo(eventsRight, 3, 'Событие · фото 8', 104, 122, 80, 62, { rotation: 1 }),
+    photo(eventsRight, 4, 'Событие · фото 9', 16, 198, 168, 57, { rotation: -0.4 }),
+  ];
+  const rightEventCaption = text(
+    eventsRight,
+    0,
+    'Подпись разворота',
+    'ДРУЖБА · ОТКРЫТИЯ · ВОСПОМИНАНИЯ',
+    26,
+    261,
+    148,
+    8,
+    muted,
+    'center',
+    { letterSpacingEm: 0.12 },
+  );
+
+  const portraitHero = photo(portraitLeft, 0, 'Главное фото выпускника', 42, 38, 122, 178, {
+    rounded: false,
+    shadow: true,
+  });
+  portraitHero.binding = {
+    source: 'participant',
+    field: 'photoAssetId',
+    fallback: grade4NeutralPlaceholderAssetId,
+  };
+  const portraitName = text(
+    portraitLeft,
+    0,
+    'ФИО выпускника',
+    'ИМЯ ФАМИЛИЯ',
+    30,
+    228,
+    140,
+    20,
+    ink,
+    'center',
+    { fontWeight: '700', letterSpacingEm: 0.08 },
+  );
+  portraitName.binding = {
+    source: 'participant',
+    field: 'fullName',
+    fallback: 'ИМЯ ФАМИЛИЯ',
+  };
+  const portraitRole = text(
+    portraitLeft,
+    1,
+    'Подпись выпускника',
+    'ВЫПУСКНИК · 4 КЛАСС',
+    44,
+    254,
+    112,
+    8,
+    muted,
+    'center',
+    { letterSpacingEm: 0.14 },
+  );
+
+  const rosterFrames = Array.from({ length: 18 }, (_, index) => {
+    const column = index % 3;
+    const row = Math.floor(index / 3);
+    const layer = photo(
+      portraitRight,
+      10 + index,
+      `Фото одноклассника ${index + 1}`,
+      18 + column * 58,
+      29 + row * 39,
+      39,
+      27,
+      { rounded: false, shadow: false },
+    );
+    layer.binding = {
+      source: 'class',
+      field: `students.${index + 1}.photoAssetId`,
+      fallback: grade4NeutralPlaceholderAssetId,
+    };
+    return layer;
+  });
+  const rosterNames = Array.from({ length: 18 }, (_, index) => {
+    const column = index % 3;
+    const row = Math.floor(index / 3);
+    return text(
+      portraitRight,
+      30 + index,
+      `Имя одноклассника ${index + 1}`,
+      'ИМЯ ФАМИЛИЯ',
+      16 + column * 58,
+      57 + row * 39,
+      43,
+      5.7,
+      ink,
+      'center',
+      { fontWeight: '500', lineHeight: 0.9 },
+    );
+  });
+  const rosterTitle = text(
+    portraitRight,
+    0,
+    'Заголовок сетки класса',
+    'МЫ ВМЕСТЕ',
+    20,
+    8,
+    160,
+    11,
+    ink,
+    'center',
+    { fontWeight: '700', letterSpacingEm: 0.16 },
+  );
+  const rosterYear = text(
+    portraitRight,
+    1,
+    'Год на сетке класса',
+    '2026',
+    70,
+    264,
+    60,
+    8,
+    muted,
+    'center',
+    { letterSpacingEm: 0.18 },
+  );
+  rosterYear.binding = { source: 'class', field: 'academicYear', fallback: '2026' };
+
+  const backSchool = text(
+    backCover,
+    0,
+    'Название школы · задняя обложка',
+    'ШКОЛА',
+    46,
+    152,
+    108,
+    12,
+    ink,
+    'center',
+    { fontWeight: '600', letterSpacingEm: 0.16 },
+  );
+  backSchool.binding = { source: 'class', field: 'schoolName', fallback: 'ШКОЛА' };
+  const backClass = text(
+    backCover,
+    1,
+    'Класс · задняя обложка',
+    '4-А',
+    64,
+    93,
+    72,
+    46,
+    yellow,
+    'center',
+    { fontWeight: '700' },
+  );
+  backClass.binding = { source: 'class', field: 'className', fallback: '4-А' };
+  const backYear = text(
+    backCover,
+    2,
+    'Год · задняя обложка',
+    '2026',
+    64,
+    180,
+    72,
+    10,
+    muted,
+    'center',
+    { letterSpacingEm: 0.14 },
+  );
+  backYear.binding = { source: 'class', field: 'academicYear', fallback: '2026' };
+
+  const layers: CanvasLayerSnapshot[] = [
+    background(id, cover.id, paper),
+    ...triangle(cover, 'cover-triangle-top', 31, 54, 18, gray),
+    ...magnifier(cover, 'cover-magnifier', 43, 28),
+    ...dottedArc(cover, 'cover-dots', 129, 127, 29, -78, 72, muted),
+    shape(
+      cover,
+      'cover-yellow-dash',
+      'Декор · жёлтый штрих',
+      'rect',
+      4,
+      121,
+      35,
+      4,
+      18,
+      yellow,
+      34,
+    ),
+    shape(cover, 'cover-blue-dash', 'Декор · голубой штрих', 'rect', 4, 144, 63, 8, 25, blue, 38),
+    shape(cover, 'cover-black-dash', 'Декор · чёрный штрих', 'rect', 4, 50, 168, 4, 22, ink, -52),
+    ...inkDots(cover, 'cover-ink', 69, 176, 15),
+    coverClass,
+    coverLetter,
+    text(cover, 4, 'Служебная подпись «класс»', 'КЛАСС', 22, 94, 24, 6.5, ink, 'center', {
+      letterSpacingEm: 0.12,
+    }),
+    coverSchool,
+    coverYear,
+
+    background(id, eventsLeft.id, paper),
+    shape(
+      eventsLeft,
+      'events-left-yellow',
+      'Декор · жёлтая плашка',
+      'rect',
+      2,
+      154,
+      8,
+      24,
+      7,
+      yellow,
+      -8,
+    ),
+    shape(
+      eventsLeft,
+      'events-left-blue',
+      'Декор · голубая плашка',
+      'rect',
+      2,
+      8,
+      146,
+      25,
+      6,
+      blue,
+      42,
+    ),
+    ...triangle(eventsLeft, 'events-left-triangle', 159, 224, 14, gray),
+    ...dottedArc(eventsLeft, 'events-left-dots', 103, 142, 22, 200, 340, gray),
+    ...leftEventPhotos,
+    eventTitle,
+
+    background(id, eventsRight.id, paper),
+    shape(
+      eventsRight,
+      'events-right-yellow',
+      'Декор · жёлтый угол',
+      'rect',
+      2,
+      0,
+      10,
+      30,
+      6,
+      yellow,
+      12,
+    ),
+    shape(
+      eventsRight,
+      'events-right-blue',
+      'Декор · голубой штрих',
+      'rect',
+      2,
+      172,
+      182,
+      6,
+      28,
+      blue,
+      48,
+    ),
+    ...magnifier(eventsRight, 'events-right-magnifier', 160, 238),
+    ...inkDots(eventsRight, 'events-right-ink', 9, 256, 8),
+    ...rightEventPhotos,
+    rightEventCaption,
+
+    background(id, portraitLeft.id, paper),
+    shape(
+      portraitLeft,
+      'portrait-left-yellow',
+      'Декор · жёлтая плашка',
+      'rect',
+      2,
+      18,
+      24,
+      44,
+      9,
+      yellow,
+      -8,
+    ),
+    shape(
+      portraitLeft,
+      'portrait-left-blue',
+      'Декор · голубая плашка',
+      'rect',
+      2,
+      151,
+      207,
+      31,
+      8,
+      blue,
+      42,
+    ),
+    ...triangle(portraitLeft, 'portrait-left-triangle', 15, 202, 19, gray),
+    ...dottedArc(portraitLeft, 'portrait-left-dots', 166, 51, 20, -70, 75, muted),
+    ...inkDots(portraitLeft, 'portrait-left-ink', 23, 232, 10),
+    portraitHero,
+    portraitName,
+    portraitRole,
+
+    background(id, portraitRight.id, paper),
+    shape(
+      portraitRight,
+      'portrait-right-yellow',
+      'Декор · жёлтая плашка',
+      'rect',
+      2,
+      158,
+      10,
+      23,
+      6,
+      yellow,
+      12,
+    ),
+    shape(
+      portraitRight,
+      'portrait-right-blue',
+      'Декор · голубой плашка',
+      'rect',
+      2,
+      8,
+      254,
+      27,
+      6,
+      blue,
+      -36,
+    ),
+    shape(
+      portraitRight,
+      'portrait-right-wash',
+      'Декор · светло-голубой фон',
+      'rect',
+      1,
+      0,
+      0,
+      6,
+      280,
+      paleBlue,
+    ),
+    ...rosterFrames,
+    ...rosterNames,
+    rosterTitle,
+    rosterYear,
+
+    background(id, backCover.id, paper),
+    ...magnifier(backCover, 'back-magnifier', 139, 43),
+    ...triangle(backCover, 'back-triangle', 42, 53, 20, gray),
+    ...dottedArc(backCover, 'back-dots', 105, 126, 36, -55, 65, muted),
+    ...inkDots(backCover, 'back-ink', 82, 210, 15),
+    shape(
+      backCover,
+      'back-blue-dash',
+      'Декор · голубой штрих',
+      'rect',
+      3,
+      54,
+      194,
+      6,
+      24,
+      blue,
+      47,
+    ),
+    shape(
+      backCover,
+      'back-yellow-dash',
+      'Декор · жёлтый штрих',
+      'rect',
+      3,
+      132,
+      72,
+      5,
+      18,
+      yellow,
+      31,
+    ),
+    backClass,
+    backSchool,
+    backYear,
+  ];
+
+  const document: CanvasDocument = {
+    version: 2,
+    projectId: id,
+    pages,
+    layers,
+    updatedAt: createdAt,
+  };
+
+  return {
+    format: 'vakha-template',
+    version: 1,
+    template: {
+      id,
+      name: '4-А · геометрия',
+      description:
+        'Оригинальный светлый альбом для 4 класса: крупная типографика, жёлто-голубой геометрический декор, событийный фотоколлаж и персональный разворот. Все элементы и фотографии редактируются отдельно.',
+      category: 'grade-4',
+      style: 'geometric',
+      color: 'multicolor',
+      orientation: 'portrait',
+      source: 'codex',
+      favorite: false,
+      createdAt,
+      updatedAt: createdAt,
+    },
+    document,
+    assets: [
+      {
+        id: grade4NeutralPlaceholderAssetId,
+        path: `assets/${grade4NeutralPlaceholderAssetId}`,
+        filename: 'grade4-neutral-placeholder.svg',
+        mimeType: 'image/svg+xml',
+        kind: 'svg',
+        byteSize: 1082,
+        metadata: { widthPx: 2400, heightPx: 3200 },
+      },
+    ],
+  };
 }
 
 function createReferenceMixTemplate(): TemplateManifest {
@@ -2580,6 +3312,7 @@ function createEditorialBurgundyTemplate(): TemplateManifest {
 }
 
 export const systemTemplates: TemplateManifest[] = [
+  createGrade4GeometryTemplate(),
   createSpbMarbleTemplate(),
   createEditorialBurgundyTemplate(),
   createReferenceMixTemplate(),
